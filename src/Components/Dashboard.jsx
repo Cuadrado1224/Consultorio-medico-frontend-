@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Heart, Users, Calendar, Activity, UserPlus, FileText, 
-  Bell, Settings, LogOut, Stethoscope, Bed, Clock, TrendingUp, Loader2, ArrowRight 
+  Bell, Settings, LogOut, Stethoscope, Bed, Clock, TrendingUp, Loader2 
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import Logo from '../assets/Logo.png';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../service/apiService';
 
@@ -127,7 +125,7 @@ const Dashboard = () => {
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <img src={Logo} alt="Logo" className="w-10 h-10 object-contain" />
+              <Heart className="w-8 h-8 text-blue-600" />
               <span className="text-xl font-bold text-gray-900">MediCare+</span>
             </div>
             {dashboardData.error && (
@@ -224,9 +222,9 @@ const Dashboard = () => {
               <div className="p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-gray-900">Pacientes Recientes</h2>
-                  <Link to="/patients" className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium">
-                    Ver todos <ArrowRight className="w-4 h-4" />
-                  </Link>
+                  <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                    Ver todos
+                  </button>
                 </div>
               </div>
               <div className="p-6">

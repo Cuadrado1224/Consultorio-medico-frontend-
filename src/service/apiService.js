@@ -21,6 +21,7 @@ class ApiService {
     return resp.json();
   }
 
+
   async login(credentials) {
     const resp = await fetch(`${baseURL}${endpoints.login}`, {
       method: 'POST',
@@ -41,6 +42,7 @@ class ApiService {
   async getPatients() {
     return this.request(endpoints.patients);
   }
+
 }
 
 export const apiService = new ApiService();
