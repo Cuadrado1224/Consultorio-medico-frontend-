@@ -8,6 +8,9 @@ export const tokenUtils = {
   
   set: (token, remember = false) => {
     if (typeof window !== 'undefined') {
+      if (typeof token === 'string') {
+        token = token.trim();
+      }
       if (remember) {
         localStorage?.setItem('token', token);
         sessionStorage?.removeItem('token');
