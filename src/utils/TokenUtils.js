@@ -1,14 +1,23 @@
 // Funciones auxiliares para manejo de cookies
 const cookieUtils = {
-  set: (name, value, expirationMinutes = 30) => {
+  set: (name, value, expirationMinutes = null) => {
     if (typeof window === 'undefined') return;
     
-    const date = new Date();
-    date.setTime(date.getTime() + (expirationMinutes * 60 * 1000));
-    const expires = `expires=${date.toUTCString()}`;
+    let cookieString = `${name}=${value}; path=/; SameSite=Strict`;
     
-    // Configurar cookie con seguridad
-    document.cookie = `${name}=${value}; ${expires}; path=/; SameSite=Strict; Secure=${location.protocol === 'https:'}`;
+    // Solo agregar expires si se especifica (cookie persistente)
+    if (expirationMinutes !== null) {
+      const date = new Date();
+      date.setTime(date.getTime() + (expirationMinutes * 60 * 1000));
+      cookieString += `; expires=${date.toUTCString()}`;
+    }
+    
+    // Agregar Secure solo en HTTPS
+    if (location.protocol === 'https:') {
+      cookieString += '; Secure';
+    }
+    
+    document.cookie = cookieString;
   },
   
   get: (name) => {
@@ -67,9 +76,8 @@ export const tokenUtils = {
       // Remover cookie de sesión si existía
       cookieUtils.remove('sessionToken');
     } else {
-      // Cookie de sesión que expira al cerrar el navegador
-      // Lo hacemos con una duración muy corta para simular sessionStorage
-      cookieUtils.set('sessionToken', token, 480); // 8 horas como máximo para sesión
+      // Session cookie - se elimina automáticamente al cerrar el navegador
+      cookieUtils.set('sessionToken', token); // SIN expirationMinutes = session cookie
       // Remover cookie persistente si existía
       cookieUtils.remove('authToken');
     }
