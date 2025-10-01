@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { apiService } from '../service/apiService';
+import { http } from '../service/httpClient';
 
 
 
@@ -14,7 +14,7 @@ const CentroMedico = () => {
       try {
         setLoading(true);
         setError(null);
-  const data = await apiService.getCentrosMedicos();
+  const { data } = await http.get('Administracion/CentrosMedicos');
   let lista = [];
   if (Array.isArray(data)) lista = data;
   else if (Array.isArray(data?.data)) lista = data.data;

@@ -1,10 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Heart, Hospital, Users, Calendar, Activity, UserPlus, FileText,
-  Bell, Settings, LogOut, Stethoscope, Loader2 
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { Heart, Hospital, Users, Calendar, FileText, Bell, Settings, LogOut, Stethoscope } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { apiService } from '../service/apiService';
 import CentroMedico from './CentroMedico';
 import Empleados from './Empleados';
 import Resumen from './Resumen';
@@ -12,12 +8,10 @@ import Resumen from './Resumen';
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const [activeSection, setActiveSection] = useState('overview');
- 
-  const [dashboardData, setDashboardData] = useState({ loading: false, error: null });
 
   const menuItems = [
-    { id: 'employees', label: 'Empleados', icon: Users, path: 'Administracion/Empleados' },
-    { id: 'patients', label: 'Centros Médicos', icon: Hospital, path: 'Administracion/CentrosMedicos' },
+    { id: 'employees', label: 'Empleados', icon: Users },
+    { id: 'patients', label: 'Centros Médicos', icon: Hospital },
     { id: 'appointments', label: 'Citas', icon: Calendar },
     { id: 'medical-records', label: 'Historiales', icon: FileText },
     { id: 'staff', label: 'Personal', icon: Stethoscope },
@@ -47,20 +41,13 @@ const Dashboard = () => {
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Heart className="w-8 h-8 text-blue-600" />
-              <span className="text-xl font-bold text-gray-900">MediCare+</span>
-            </div>
-            
+          <div className="flex items-center space-x-2">
+            <Heart className="w-8 h-8 text-blue-600" />
+            <span className="text-xl font-bold text-gray-900">MediCare+</span>
           </div>
-
           <div className="flex items-center space-x-4">
-            <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full">
-              <Bell className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">3</span>
-            </button>
-            
+           
+
             <div className="flex items-center space-x-3">
               <div className="text-right">
                 <p className="text-sm font-medium text-gray-900">
