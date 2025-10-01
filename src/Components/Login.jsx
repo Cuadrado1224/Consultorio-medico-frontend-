@@ -14,6 +14,20 @@ const Login = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const Toast = Swal.mixin({
+    toast: true,
+    position: "top-end",
+    showConfirmButton: false,
+    timer: 2000,
+    timerProgressBar: true,
+    background: "#e8f5e9",
+    color: "#2e7d32",
+    iconColor: "#4caf50",
+    didOpen: (toast) => {
+      toast.onmouseenter = Swal.stopTimer;
+      toast.onmouseleave = Swal.resumeTimer;
+    },
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,27 +57,14 @@ const Login = () => {
         });
         setLoading(false);
         return;
+      } else {
+        Toast.fire({
+          title: "Inicio de sesión correcto!",
+          icon: "success",
+        }).then(() => {
+          navigate("/");
+        });
       }
-      const Toast = Swal.mixin({
-        toast: true,
-        position: "top-end",
-        showConfirmButton: false,
-        timer: 2000,
-        timerProgressBar: true,
-        background: "#e8f5e9",
-        color: "#2e7d32",
-        iconColor: "#4caf50",
-        didOpen: (toast) => {
-          toast.onmouseenter = Swal.stopTimer;
-          toast.onmouseleave = Swal.resumeTimer;
-        },
-      });
-      Toast.fire({
-        title: "Inicio de sesión correcto!",
-        icon: "success",
-      }).then(() => {
-        navigate("/");
-      });
     } catch (err) {
       Swal.fire({
         title: "Error",
@@ -84,7 +85,7 @@ const Login = () => {
             <img
               src={Logo}
               alt="Logo"
-              className="w-40 h-40 object-contain drop-shadow-sm select-none"
+              className="w-80 h-40 object-contain drop-shadow-sm select-none"
               draggable={false}
             />
           </div>
@@ -96,7 +97,6 @@ const Login = () => {
         {/* Formulario de Login */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
           <form onSubmit={handleSubmit} className="space-y-8">
-
             <div>
               <label className="block text-lg font-semibold text-gray-700 mb-2">
                 Username
