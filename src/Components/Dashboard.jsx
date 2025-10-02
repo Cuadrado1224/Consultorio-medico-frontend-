@@ -4,16 +4,14 @@ import {
   Bell, Settings, LogOut, Stethoscope, Loader2 
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { apiService } from '../service/apiService';
 import CentroMedico from './CentroMedico';
 import Empleados from './Empleados';
 import Resumen from './Resumen';
+import Citas from './Citas';
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const [activeSection, setActiveSection] = useState('overview');
- 
-  const [dashboardData, setDashboardData] = useState({ loading: false, error: null });
 
   const menuItems = [
     { id: 'employees', label: 'Empleados', icon: Users, path: 'Administracion/Empleados' },
@@ -30,6 +28,8 @@ const Dashboard = () => {
         return <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100"><CentroMedico /></div>;
       case 'employees':
         return <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100"><Empleados /></div>;
+      case 'appointments':
+        return <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100"><Citas /></div>;
       case 'medical-records':
         return <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100"><h1 className="text-xl font-semibold mb-2">Historiales Médicos</h1><p className="text-gray-600 text-sm">Listado / búsqueda de historiales.</p></div>;
       case 'staff':

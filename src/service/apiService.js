@@ -4,7 +4,8 @@ import config from '../config';
 const baseURL = (config.apiUrl || '').replace(/\/+$/, '/')
 const endpoints = {
   login: 'login',
-  centrosMedicos:'Administracion/CentrosMedicos'
+  centrosMedicos:'Administracion/CentrosMedicos',
+  consultas: 'CentroMedico/Consultas'
 };
 
 class ApiService {
@@ -68,7 +69,71 @@ class ApiService {
     });
   }
 
-  
+  // Métodos para gestión de consultas médicas
+  async getConsultas(filtros = {}) {
+    const params = new URLSearchParams();
+    if (filtros.fecha) params.append('fecha', filtros.fecha);
+    if (filtros.medicoId) params.append('empleadoId', filtros.medicoId);
+    if (filtros.pacienteId) params.append('pacienteId', filtros.pacienteId);
+    
+    const queryString = params.toString();
+    const url = queryString ? `${endpoints.consultas}?${queryString}` : endpoints.consultas;
+    return this.request(url);
+  }
+
+  async getConsultaById(id) {
+    return this.request(`${endpoints.consultas}/${id}`);
+  }
+
+  async createConsulta(data) {
+    return this.request(endpoints.consultas, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateConsulta(id, data) {
+    return this.request(`${endpoints.consultas}/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteConsulta(id) {
+    return this.request(`${endpoints.consultas}/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // Métodos de compatibilidad (alias)
+  async getCitas(filtros = {}) {
+    return this.getConsultas(filtros);
+  }
+
+  async getCitaById(id) {
+    return this.getConsultaById(id);
+  }
+
+  async createCita(data) {
+    return this.createConsulta(data);
+  }
+
+  async updateCita(id, data) {
+    return this.updateConsulta(id, data);
+  }
+
+  async deleteCita(id) {
+    return this.deleteConsulta(id);
+  }
+
+  // Métodos para obtener datos necesarios
+  async getPacientes() {
+    return this.request('CentroMedico/Pacientes');
+  }
+
+  async getEmpleados() {
+    return this.request('Administracion/Empleados');
+  }
 }
 
 export const apiService = new ApiService();
