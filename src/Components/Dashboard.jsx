@@ -14,6 +14,7 @@ import { useAuth } from "../context/AuthContext";
 import CentroMedico from "./CentroMedico";
 import Empleados from "./Empleados";
 import Resumen from "./Resumen";
+import Citas from "./Citas";
 import Logo from "../assets/Logo.png";
 
 const Dashboard = () => {
@@ -41,6 +42,12 @@ const Dashboard = () => {
         return (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <Empleados />
+          </div>
+        );
+      case "appointments":
+        return (
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <Citas />
           </div>
         );
       case "medical-records":

@@ -10,6 +10,9 @@ const cookieUtils = {
       const date = new Date();
       date.setTime(date.getTime() + (expirationMinutes * 60 * 1000));
       cookieString += `; expires=${date.toUTCString()}`;
+      console.log(`[Cookie] Creando cookie persistente '${name}' que expira en: ${date.toLocaleString()}`);
+    } else {
+      console.log(`[Cookie] Creando session cookie '${name}' (se elimina al cerrar navegador)`);
     }
     
     // Agregar Secure solo en HTTPS
@@ -18,6 +21,7 @@ const cookieUtils = {
     }
     
     document.cookie = cookieString;
+    console.log(`[Cookie] Cookie creada: ${cookieString}`);
   },
   
   get: (name) => {
@@ -32,14 +36,18 @@ const cookieUtils = {
         cookie = cookie.substring(1, cookie.length);
       }
       if (cookie.indexOf(nameEQ) === 0) {
-        return cookie.substring(nameEQ.length, cookie.length);
+        const value = cookie.substring(nameEQ.length, cookie.length);
+        console.log(`[Cookie] Cookie '${name}' encontrada: ${value.substring(0, 20)}...`);
+        return value;
       }
     }
+    console.log(`[Cookie] Cookie '${name}' no encontrada`);
     return null;
   },
   
   remove: (name) => {
     if (typeof window === 'undefined') return;
+    console.log(`[Cookie] Eliminando cookie '${name}'`);
     document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
   }
 };
@@ -47,6 +55,8 @@ const cookieUtils = {
 export const tokenUtils = {
   get: () => {
     if (typeof window === 'undefined') return null;
+    
+    console.log(`[TokenUtils] Obteniendo token...`);
     
     // Obtener token del cookie persistente (remember = true)
     const persistentToken = cookieUtils.get('authToken');
@@ -60,6 +70,7 @@ export const tokenUtils = {
       return sessionToken;
     }
     
+    console.log(`[TokenUtils] No se encontró token`);
     return null;
   },
   
@@ -69,6 +80,8 @@ export const tokenUtils = {
     if (typeof token === 'string') {
       token = token.trim();
     }
+    
+    console.log(`[TokenUtils] Guardando token, remember=${remember}`);
     
     if (remember) {
       // Cookie persistente con expiración de 30 minutos
@@ -86,6 +99,7 @@ export const tokenUtils = {
   remove: () => {
     if (typeof window === 'undefined') return;
     
+    console.log(`[TokenUtils] Eliminando todos los tokens`);
     // Limpiar ambos tipos de cookies
     cookieUtils.remove('authToken');
     cookieUtils.remove('sessionToken');
@@ -94,8 +108,11 @@ export const tokenUtils = {
   isExpired: (token) => {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload.exp * 1000 < Date.now();
+      const isExpired = payload.exp * 1000 < Date.now();
+      console.log(`[TokenUtils] Token ${isExpired ? 'EXPIRADO' : 'VÁLIDO'}, exp: ${new Date(payload.exp * 1000).toLocaleString()}`);
+      return isExpired;
     } catch {
+      console.log(`[TokenUtils] Error al verificar expiración del token`);
       return true;
     }
   }
