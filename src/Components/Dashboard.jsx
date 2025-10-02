@@ -15,6 +15,7 @@ import CentroMedico from "./CentroMedico";
 import Empleados from "./Empleados";
 import Resumen from "./Resumen";
 import Citas from "./Citas";
+import Personal from "./Personal"; // agregado
 import Logo from "../assets/Logo.png";
 
 const Dashboard = () => {
@@ -62,10 +63,7 @@ const Dashboard = () => {
       case "staff":
         return (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h1 className="text-xl font-semibold mb-2">Personal</h1>
-            <p className="text-gray-600 text-sm">
-              Gestión de médicos y personal sanitario.
-            </p>
+            <Personal />
           </div>
         );
       case "settings":
