@@ -1,18 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { http } from '../service/httpClient';
 import { 
   Heart,Hospital, Users, Calendar, Activity, UserPlus, FileText, 
   Bell, Settings, LogOut, Stethoscope, Bed, Clock, TrendingUp, Loader2 
 } from 'lucide-react';
 
 const Resumen = () => {
-    const [dashboardData, setDashboardData] = useState({
-        stats: [],
-        recentPatients: [],
-        recentActivity: [],
-        loading: true,
-        error: null
-      });
-     const defaultStats = [
+  const defaultStats = [
     {
       title: 'Pacientes Hoy',
       value: '156',
@@ -42,6 +36,28 @@ const Resumen = () => {
       color: 'bg-purple-500'
     }
   ];
+  const defaultPatients = [
+    { name: 'María González', id: '001234', status: 'En consulta', time: '10:30 AM' },
+    { name: 'Carlos Rodríguez', id: '001235', status: 'Esperando', time: '11:00 AM' },
+    { name: 'Ana López', id: '001236', status: 'Completado', time: '11:30 AM' },
+    { name: 'Luis Martínez', id: '001237', status: 'En consulta', time: '12:00 PM' }
+  ];
+
+  const defaultActivity = [
+    { action: 'Nueva cita programada', patient: 'Elena Vargas', time: '2 min ago', type: 'appointment' },
+    { action: 'Historial actualizado', patient: 'Miguel Torres', time: '15 min ago', type: 'record' },
+    { action: 'Alta médica', patient: 'Sofia Jiménez', time: '1 hora ago', type: 'discharge' },
+    { action: 'Ingreso de emergencia', patient: 'Roberto Silva', time: '2 horas ago', type: 'emergency' }
+  ];
+
+    const [dashboardData, setDashboardData] = useState({
+        stats: defaultStats,
+        recentPatients: defaultPatients,
+        recentActivity: defaultActivity,
+        loading: true,
+        error: null
+      });
+
    useEffect(() => {
       const loadDashboardData = async () => {
         try {
@@ -49,15 +65,15 @@ const Resumen = () => {
   
           // Intentar cargar datos del backend
           const [statsData, patientsData, activityData] = await Promise.allSettled([
-            apiService.getDashboardStats(),
-            apiService.getRecentPatients(),
-            apiService.getRecentActivity()
+            http.get('Dashboard/Stats'),
+            http.get('Dashboard/RecentPatients'),
+            http.get('Dashboard/RecentActivity')
           ]);
   
           setDashboardData({
-            stats: statsData.status === 'fulfilled' ? statsData.value : defaultStats,
-            recentPatients: patientsData.status === 'fulfilled' ? patientsData.value : defaultPatients,
-            recentActivity: activityData.status === 'fulfilled' ? activityData.value : defaultActivity,
+            stats: statsData.status === 'fulfilled' ? statsData.value.data : defaultStats,
+            recentPatients: patientsData.status === 'fulfilled' ? patientsData.value.data : defaultPatients,
+            recentActivity: activityData.status === 'fulfilled' ? activityData.value.data : defaultActivity,
             loading: false,
             error: null
           });
@@ -76,19 +92,24 @@ const Resumen = () => {
       loadDashboardData();
     }, []);
 
-  const defaultPatients = [
-    { name: 'María González', id: '001234', status: 'En consulta', time: '10:30 AM' },
-    { name: 'Carlos Rodríguez', id: '001235', status: 'Esperando', time: '11:00 AM' },
-    { name: 'Ana López', id: '001236', status: 'Completado', time: '11:30 AM' },
-    { name: 'Luis Martínez', id: '001237', status: 'En consulta', time: '12:00 PM' }
-  ];
+  if (dashboardData.loading) {
+    return (
+      <div className="p-6">
+        <p className="text-gray-600">Cargando resumen...</p>
+      </div>
+    );
+  }
 
-  const defaultActivity = [
-    { action: 'Nueva cita programada', patient: 'Elena Vargas', time: '2 min ago', type: 'appointment' },
-    { action: 'Historial actualizado', patient: 'Miguel Torres', time: '15 min ago', type: 'record' },
-    { action: 'Alta médica', patient: 'Sofia Jiménez', time: '1 hora ago', type: 'discharge' },
-    { action: 'Ingreso de emergencia', patient: 'Roberto Silva', time: '2 horas ago', type: 'emergency' }
-  ];
+  if (dashboardData.error) {
+    return (
+      <div className="p-6">
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded mb-4 text-sm">
+          {dashboardData.error}
+        </div>
+        {/* Mostrar igualmente contenido con datos por defecto */}
+      </div>
+    );
+  }
 
   return (
           <>
