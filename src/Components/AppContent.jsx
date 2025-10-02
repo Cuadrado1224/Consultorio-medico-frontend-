@@ -9,7 +9,7 @@ const AppContent = () => {
   if (loading) {
     return <LoadingScreen />;
   }
-
+//agregar redireccion para consultas
   return isAuthenticated ? <Dashboard /> : <LoginScreen />;
 };
 
