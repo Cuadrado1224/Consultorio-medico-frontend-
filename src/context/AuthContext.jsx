@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
 import { tokenUtils } from '../utils/TokenUtils';
-import { apiService } from '../service/apiService';
+import { http } from '../service/httpClient';
 
 const AuthContext = createContext();
 
@@ -14,24 +14,50 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(!!tokenUtils.get());
+  const [token, setToken] = useState(tokenUtils.get());
+  const [isAuthenticated, setIsAuthenticated] = useState(!!token);
 
   const login = async (credentials, remember = false) => {
     try {
-      if (import.meta.env.DEV) console.log('[AuthContext] intentando login', credentials);
-      const { token, user: userData } = await apiService.login(credentials);
+      const { data, status } = await http.post('login', credentials, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (status < 200 || status >= 300) throw new Error('LOGIN_ERROR');
+      let token = data;
+      if (data && typeof data === 'object') {
+        token = data.token || data.accessToken || data.token_ || '';
+      }
+      if (typeof token === 'string') token = token.trim();
       if (!token) throw new Error('SIN_TOKEN');
 
+      const userData = data?.user || {
+        username: credentials.nombreUsuario,
+        name: data?.nombre || credentials.nombreUsuario,
+        email: data?.email || '',
+        roles: data?.roles || [],
+        permisos: data?.permisos || [],
+      };
+    
+      const roles = data?.roles || userData.roles || [];
+      const expiresAt = data?.expiresAt || null;
+
       tokenUtils.set(token, remember);
-      setUser(userData);
+      setToken(token);
+      setUser({ ...userData, roles, expiresAt });
       setIsAuthenticated(true);
-      if (import.meta.env.DEV) console.log('[AuthContext] login OK', userData);
-      return { success: true };
+
+      return {
+        success: true,
+        token,
+        user: { ...userData, roles, expiresAt },
+        roles,
+        expiresAt
+      };
     } catch (error) {
-      console.error('[AuthContext] Error en login:', error.message);
+      console.error('[AuthContext] Error en login:', error?.message);
       let friendly = 'Error de conexión. Intenta nuevamente.';
-      if (error.message === 'CREDENCIALES_INVALIDAS' || error.message === 'HTTP 401: Unauthorized') {
+      if (error.message === 'LOGIN_ERROR' || error.message.includes('401')) {
         friendly = 'Credenciales incorrectas';
       } else if (error.message === 'SIN_TOKEN') {
         friendly = 'El servidor no devolvió token';
@@ -43,19 +69,12 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     tokenUtils.remove();
     setUser(null);
+    setToken(null);
     setIsAuthenticated(false);
   };
 
-  const value = {
-    user,
-    loading,
-    isAuthenticated,
-    login,
-    logout
-  };
-
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
