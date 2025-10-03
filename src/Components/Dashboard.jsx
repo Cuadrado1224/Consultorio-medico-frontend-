@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Heart,
   Hospital,
@@ -17,27 +17,84 @@ import Empleados from "./Empleados";
 import Resumen from "./Resumen";
 import Reportes from "./Reportes";
 import Citas from "./Citas";
-import Personal from "./Personal"; // agregado
-import Swal from "sweetalert2";
+import Personal from "./Personal";
+import Pacientes from "./Pacientes";
 import Logo from "../assets/Logo.png";
+import { tokenUtils } from "../utils/TokenUtils";
+import Swal from "sweetalert2";
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
-  const [activeSection, setActiveSection] = useState("overview");
+  const [activeSection, setActiveSection] = useState("resume");
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  const menuItems = [
+  // Extrae TipoEmpleado desde el token JWT de forma segura
+  const getTipoEmpleadoFromToken = () => {
+    try {
+      const token = tokenUtils?.get && tokenUtils.get();
+      if (!token) return null;
+      const parts = token.split(".");
+      if (parts.length < 2) return null;
+      const payload = JSON.parse(atob(parts[1]));
+      // Buscar claves posibles (case-insensitive)
+      const keys = Object.keys(payload || {});
+      const keyFound = keys.find((k) => k.toLowerCase() === "tipoempleado" || k.toLowerCase() === "tipo_empleado" || k.toLowerCase() === "tipo");
+      if (keyFound) return payload[keyFound];
+      // fallback directo
+      return payload.TipoEmpleado || payload.tipoEmpleado || null;
+    } catch (e) {
+      console.warn("No se pudo leer TipoEmpleado desde token:", e);
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    const tipo = getTipoEmpleadoFromToken();
+    setIsAdmin(typeof tipo === "string" && tipo.toLowerCase() === "administrador");
+  }, []);
+
+  // Menú dependiendo del rol
+  const adminMenu = [
     { id: "resume", label: "Resumen", icon: BookOpen },
     { id: "employees", label: "Empleados", icon: Users },
-    { id: "patients", label: "Centros Médicos", icon: Hospital },
+    { id: "centers", label: "Centros Médicos", icon: Hospital },
+    { id: "patients", label: "Pacientes", icon: Heart },
     { id: "reports", label: "Citas Medicas", icon: Calendar },
     { id: "medical-records", label: "Reportes", icon: FileText },
     { id: "staff", label: "Personal", icon: Stethoscope },
-   
+    { id: "settings", label: "Configuración", icon: Settings },
   ];
+
+  const restrictedMenu = [
+    { id: "patients", label: "Pacientes", icon: Heart },
+    { id: "reports", label: "Citas Medicas", icon: Calendar },
+  ];
+
+  const menuItems = isAdmin ? adminMenu : restrictedMenu;
+
+  // Si la sección activa no está permitida por el rol, cambiarla al primer item disponible
+  useEffect(() => {
+    const allowedIds = menuItems.map((m) => m.id);
+    if (!allowedIds.includes(activeSection)) {
+      setActiveSection(allowedIds[0] || "resume");
+    }
+  }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const renderContent = () => {
     switch (activeSection) {
+      case "resume":
+        return (
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <Resumen />
+          </div>
+        );
       case "patients":
+        return (
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <Pacientes />
+          </div>
+        );
+      case "centers":
         return (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <CentroMedico />
@@ -45,26 +102,17 @@ const Dashboard = () => {
         );
       case "employees":
         return (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <Empleados />
-            </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <Empleados />
+          </div>
         );
-
       case "reports":
-        return (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <Citas />
-            </div>
-        );
-
-      case "appointments":
         return (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <Citas />
           </div>
         );
       case "medical-records":
-
         return (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <Reportes />
@@ -76,61 +124,63 @@ const Dashboard = () => {
             <Personal />
           </div>
         );
-      case "resume":
+      case "settings":
         return (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <Resumen />
+            <div>
+              <h1 className="text-xl font-semibold mb-2">Configuración</h1>
+              <p className="text-gray-600 text-sm">Preferencias de la aplicación.</p>
+            </div>
           </div>
         );
-      
       case "overview":
       default:
         return <Resumen />;
     }
   };
-   const handleLogout = async () => {
-      try {
-        const result = await Swal.fire({
-          title: "¿Estás seguro?",
-          text: "¿Quieres cerrar sesión`?",
-          icon: "warning",
-          showCancelButton: true,
-          confirmButtonColor: "#3085d6",
-          cancelButtonColor: "#d33",
-          confirmButtonText: "Sí, cerrar sesión",
-          cancelButtonText: "Cancelar",
-        });
-        if (result.isConfirmed) {
-          await logout();
-          Swal.fire({
-            toast: true,
-            position: "top-end",
-            showConfirmButton: false,
-            timer: 1000,
-            timerProgressBar: true,
-            background: "#e8f5e9",
-            color: "#2e7d32",
-            iconColor: "#4caf50",
-            title: "Sesión cerrada correctamente!",
-            icon: "success",
-          });
-        }
-      } catch (e) {
+
+  const handleLogout = async () => {
+    try {
+      const result = await Swal.fire({
+        title: "¿Estás seguro?",
+        text: "¿Quieres cerrar sesión?",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#d33",
+        confirmButtonText: "Sí, cerrar sesión",
+        cancelButtonText: "Cancelar",
+      });
+      if (result.isConfirmed) {
+        await logout();
         Swal.fire({
           toast: true,
           position: "top-end",
           showConfirmButton: false,
-          timer: 2000,
+          timer: 1000,
           timerProgressBar: true,
-          background: "#ffebee",
-          color: "#b71c1c",
-          iconColor: "#d32f2f",
-          title: e?.response?.data?.message || "Error al cerrar sesión",
-          icon: "error",
+          background: "#e8f5e9",
+          color: "#2e7d32",
+          iconColor: "#4caf50",
+          title: "Sesión cerrada correctamente!",
+          icon: "success",
         });
       }
-    };
-  
+    } catch (e) {
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
+        timer: 2000,
+        timerProgressBar: true,
+        background: "#ffebee",
+        color: "#b71c1c",
+        iconColor: "#d32f2f",
+        title: e?.response?.data?.message || "Error al cerrar sesión",
+        icon: "error",
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -143,13 +193,14 @@ const Dashboard = () => {
               className="w-30 h-30 object-contain drop-shadow-sm select-none"
               draggable={false}
             />
-            
           </div>
+
           <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
             <span className="text-3xl font-bold text-black-700 tracking-wide">
               Sistema de Gestión Hospitalaria
             </span>
           </div>
+
           <div className="flex items-center space-x-4 mr-8">
             <div className="flex items-center space-x-3">
               <div className="text-right">

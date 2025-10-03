@@ -15,7 +15,7 @@ const endpoints = {
 
 export const http = axios.create({
   baseURL,
-  timeout: 10000 // 10s por defecto
+  timeout: 12000 // 12s por defecto
 });
 
 http.interceptors.request.use((req) => {
