@@ -67,4 +67,22 @@ http.getPacientes = async () => {
   return response.data;
 };
 
+// Crear nueva consulta
+http.createConsulta = async (consultaData) => {
+  const response = await http.post(endpoints.consultas, consultaData);
+  return response.data;
+};
+
+// Actualizar consulta existente
+http.updateConsulta = async (id, consultaData) => {
+  const response = await http.put(`${endpoints.consultas}/${id}`, consultaData);
+  return response.data;
+};
+
+// Eliminar consulta
+http.deleteCita = async (id, consultaData) => {
+  const response = await http.delete(`${endpoints.consultas}/${id}`, { data: consultaData });
+  return response.data;
+};
+
 export default http;

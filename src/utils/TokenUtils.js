@@ -39,7 +39,7 @@ const cookieUtils = {
         return value;
       }
     }
-   
+
     return null;
   },
 
@@ -107,7 +107,7 @@ export const tokenUtils = {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       const isExpired = payload.exp * 1000 < Date.now();
-
+      window.location.href = '/login';
       return isExpired;
     } catch {
 
