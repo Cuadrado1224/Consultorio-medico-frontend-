@@ -14,8 +14,10 @@ import { useAuth } from "../context/AuthContext";
 import CentroMedico from "./CentroMedico";
 import Empleados from "./Empleados";
 import Resumen from "./Resumen";
+import Reportes from "./Reportes";
 import Citas from "./Citas";
 import Personal from "./Personal"; // agregado
+
 import Logo from "../assets/Logo.png";
 
 const Dashboard = () => {
@@ -25,10 +27,10 @@ const Dashboard = () => {
   const menuItems = [
     { id: "employees", label: "Empleados", icon: Users },
     { id: "patients", label: "Centros Médicos", icon: Hospital },
-    { id: "appointments", label: "Citas", icon: Calendar },
+    { id: "reports", label: "Reportes", icon: Calendar },
     { id: "medical-records", label: "Historiales", icon: FileText },
     { id: "staff", label: "Personal", icon: Stethoscope },
-    { id: "settings", label: "Configuración", icon: Settings },
+   
   ];
 
   const renderContent = () => {
@@ -41,10 +43,13 @@ const Dashboard = () => {
         );
       case "employees":
         return (
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <Empleados />
-          </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <Empleados />
+            </div>
         );
+
+      case "reports":
+
       case "appointments":
         return (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -52,12 +57,10 @@ const Dashboard = () => {
           </div>
         );
       case "medical-records":
+
         return (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h1 className="text-xl font-semibold mb-2">Historiales Médicos</h1>
-            <p className="text-gray-600 text-sm">
-              Listado / búsqueda de historiales.
-            </p>
+            <Reportes />
           </div>
         );
       case "staff":
@@ -66,15 +69,7 @@ const Dashboard = () => {
             <Personal />
           </div>
         );
-      case "settings":
-        return (
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h1 className="text-xl font-semibold mb-2">Configuración</h1>
-            <p className="text-gray-600 text-sm">
-              Preferencias de la aplicación.
-            </p>
-          </div>
-        );
+      
       case "overview":
       default:
         return <Resumen />;
