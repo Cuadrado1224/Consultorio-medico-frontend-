@@ -14,7 +14,7 @@ const endpoints = {
 
 export const http = axios.create({
   baseURL,
-  timeout: 15000, 
+  timeout: 12000, 
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
