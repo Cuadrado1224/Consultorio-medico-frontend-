@@ -59,12 +59,14 @@ export const tokenUtils = {
     // Obtener token del cookie persistente (remember = true)
     const persistentToken = cookieUtils.get('authToken');
     if (persistentToken) {
+     
       return persistentToken;
     }
 
     // Obtener token del cookie de sesión (remember = false)
     const sessionToken = cookieUtils.get('sessionToken');
     if (sessionToken) {
+     
       return sessionToken;
     }
 

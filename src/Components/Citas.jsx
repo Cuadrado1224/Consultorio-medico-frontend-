@@ -63,17 +63,21 @@ const Citas = () => {
       }
       
       const payload = JSON.parse(atob(token.split('.')[1]));
-      
+      console.log('Payload del token completo:', payload); // Debug
+     
       // Intentar múltiples variaciones de campos comunes
       const userData = {
         idEmpleado: payload.IdEmpleado || payload.empleadoId || payload.id || payload.sub,
         nombre: payload.unique_name || payload.name || payload.nombre || payload.usuario,
         especialidad: payload.Especialidad || payload.especialidad,
         tipoEmpleado: payload.TipoEmpleado || payload.tipoEmpleado || payload.role,
-        tipoEmpleadoID: payload.TipoEmpleadoID || payload.tipoEmpleadoID || payload.TipoEmpleadoId || payload.tipoEmpleadoId,
+        tipoEmpleadoID: payload.TipoEmpleadoID || payload.tipoEmpleadoID || payload.TipoEmpleadoId || payload.tipoEmpleadoId || 
+                        (payload.TipoEmpleado === 'Administrador' ? 1 : 2) || // Mapear desde tipoEmpleado si está disponible
+                        (payload.tipoEmpleado === 'Administrador' ? 1 : 2), // Backup mapping
         centroMedico: payload.CentroMedico || payload.centroMedico,
         idCentroMedico: payload.idCentroMedico || payload.IdCentroMedico || payload.centroMedicoId || payload.centroMedicoID
       };
+      
       
 
       
@@ -162,9 +166,13 @@ const Citas = () => {
       // Verificar si es administrador usando tipoEmpleadoID (1 = Administrador)
       const esAdministrador = userData?.tipoEmpleadoID === 1;
       
-      if (userData && !esAdministrador) {
-        filtrosAplicados.medicoId = userData.idEmpleado;
-      }
+      console.log('Usuario actual:', userData);
+      console.log('Es administrador?', esAdministrador);
+      console.log('Filtros aplicados:', filtrosAplicados);
+      
+      // *** REMOVIDO: No aplicamos filtro por médico en backend
+      // El filtro por rol se maneja en el frontend (citasFiltradas)
+      // Esto permite mejor debugging y control
       
       const response = await http.getCitas(filtrosAplicados);
       
@@ -199,15 +207,18 @@ const Citas = () => {
     }
   }, [filtros]);
 
+  // Cargar datos iniciales al montar el componente
   useEffect(() => {
     cargarDatosIniciales();
   }, [cargarDatosIniciales]);
 
+  // Cargar citas inmediatamente al montar y cuando cambien los filtros
   useEffect(() => {
-    if (empleadoActual) {
-      cargarCitas();
-    }
-  }, [cargarCitas, empleadoActual]);
+    cargarCitas();
+  }, [cargarCitas]);
+
+  // No necesitamos el useEffect adicional para empleadoActual 
+  // porque cargarCitas ya se ejecuta automáticamente
 
 
 
@@ -375,10 +386,27 @@ const Citas = () => {
 
 
   // Optimización con useMemo para evitar recalcular filtros innecesariamente
-  const citasFiltradas = useMemo(() => citas.filter(cita => {
-    // Filtro por rango de fechas (comparación de strings de fecha en formato YYYY-MM-DD)
-    if (filtros.fechaDesde && cita.fecha && cita.fecha < filtros.fechaDesde) return false;
-    if (filtros.fechaHasta && cita.fecha && cita.fecha > filtros.fechaHasta) return false;
+  const citasFiltradas = useMemo(() => {
+    console.log('Todas las citas cargadas:', citas);
+    console.log('Empleado actual para filtros:', empleadoActual);
+    
+    return citas.filter(cita => {
+      // FILTRO POR ROL: Solo aplicar para empleados NO administradores
+      // Los administradores (tipoEmpleadoID === 1) ven TODAS las citas
+      if (empleadoActual && empleadoActual.tipoEmpleadoID !== 1) {
+        // Para empleados no-admin: solo mostrar citas donde ellos son el médico
+        console.log('Aplicando filtro de empleado. Cita médico ID:', cita.medicoId, 'Empleado ID:', empleadoActual.idEmpleado);
+        
+        if (cita.medicoId !== empleadoActual.idEmpleado && 
+            cita.medicoId?.toString() !== empleadoActual.idEmpleado?.toString()) {
+          console.log('Cita filtrada - no coincide médico ID');
+          return false;
+        }
+      }
+
+      // Filtro por rango de fechas (comparación de strings de fecha en formato YYYY-MM-DD)
+      if (filtros.fechaDesde && cita.fecha && cita.fecha < filtros.fechaDesde) return false;
+      if (filtros.fechaHasta && cita.fecha && cita.fecha > filtros.fechaHasta) return false;
     
     // Filtro por médico ID
     if (filtros.medicoId && filtros.medicoId.trim() !== '') {
@@ -415,22 +443,24 @@ const Citas = () => {
     }
     
     return true;
-  }), [citas, filtros]);
+    });
+  }, [citas, filtros, empleadoActual]);
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Citas</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Gestión de Citas Médicas</h1>
           <p className="text-gray-600">
             {empleadoActual && empleadoActual.tipoEmpleadoID === 1
-              ? "👑 Administra todas las citas médicas del consultorio" 
+              ? "Administra todas las citas médicas del consultorio" 
               : `🩺 Consultas médicas de ${empleadoActual?.nombre || user?.name || 'tu cuenta'}`}
           </p>
           {empleadoActual && (
             <p className="text-sm text-gray-500 mt-1">
-              Tipo de empleado: {empleadoActual.tipoEmpleadoID === 1 ? 'Administrador' : 'Empleado'}
+               {empleadoActual.tipoEmpleadoID === 1 ? 'Tipo de empleado: Administrador' : 'Especialidad:'} {empleadoActual.especialidad || 'N/A'}
+              
             </p>
           )}
         </div>
@@ -457,7 +487,7 @@ const Citas = () => {
           )}
         </div>
         
-                <div className={`grid grid-cols-1 gap-3 ${empleadoActual && empleadoActual.tipoEmpleadoID === 1 ? 'md:grid-cols-6' : 'md:grid-cols-5'}`}>
+                <div className={`grid gap-3 ${empleadoActual && empleadoActual.tipoEmpleadoID === 1 ? 'grid-cols-6' : 'grid-cols-5'}`}>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Desde</label>
             <input
@@ -528,36 +558,7 @@ const Citas = () => {
         </div>
       </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-2">
-            <AlertCircle className="w-5 h-5 text-amber-600" />
-            <span className="text-amber-700 font-medium">Problema de Conexión</span>
-          </div>
-          <p className="text-amber-700 mb-3">{error}</p>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => {
-                if (error && (error.toLowerCase().includes('inicie sesión') || error.toLowerCase().includes('autenticación') || error.toLowerCase().includes('unauthorized'))) {
-                  manejarErrorAutenticacion();
-                } else {
-                  cargarCitas();
-                }
-              }}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
-            >
-              {error && (error.toLowerCase().includes('inicie sesión') || error.toLowerCase().includes('autenticación') || error.toLowerCase().includes('unauthorized')) ? '🚪 Ir al Login' : '🔄 Reintentar'}
-            </button>
-            <button
-              onClick={() => setError(null)}
-              className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors text-sm"
-            >
-              ✖ Cerrar
-            </button>
-          </div>
-        </div>
-      )}
+     
 
       {/* Lista de Citas */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100">
