@@ -47,21 +47,36 @@ const Citas = () => {
   const decodificarToken = () => {
     try {
       const token = tokenUtils.get();
-      if (!token) return null;
+      if (!token) {
+        console.log('No hay token disponible');
+        return null;
+      }
+      
+      console.log('Token crudo:', token);
       
       const payload = JSON.parse(atob(token.split('.')[1]));
-      console.log('Payload del token:', payload); // Debug
+      console.log('Payload completo del token:', payload); // Debug detallado
       
+      // Intentar múltiples variaciones de campos comunes
       const userData = {
-        idEmpleado: payload.IdEmpleado,
-        nombre: payload.unique_name,
-        especialidad: payload.Especialidad,
-        tipoEmpleado: payload.TipoEmpleado,
-        centroMedico: payload.CentroMedico,
-        idCentroMedico: payload.idCentroMedico || payload.IdCentroMedico || payload.centroMedicoId
+        idEmpleado: payload.IdEmpleado || payload.empleadoId || payload.id || payload.sub,
+        nombre: payload.unique_name || payload.name || payload.nombre || payload.usuario,
+        especialidad: payload.Especialidad || payload.especialidad,
+        tipoEmpleado: payload.TipoEmpleado || payload.tipoEmpleado || payload.role,
+        centroMedico: payload.CentroMedico || payload.centroMedico,
+        idCentroMedico: payload.idCentroMedico || payload.IdCentroMedico || payload.centroMedicoId || payload.centroMedicoID
       };
       
       console.log('Datos del usuario procesados:', userData); // Debug
+      console.log('ID Centro Médico encontrado:', userData.idCentroMedico);
+      
+      // Validar que tenemos los datos mínimos necesarios
+      if (!userData.idEmpleado && !userData.nombre) {
+        console.error('Token no contiene datos de empleado válidos');
+        console.error('Campos disponibles en payload:', Object.keys(payload));
+        return null;
+      }
+      
       return userData;
     } catch (error) {
       console.error('Error decodificando token:', error);
@@ -72,15 +87,64 @@ const Citas = () => {
   // Cargar datos iniciales
   const cargarDatosIniciales = useCallback(async () => {
     try {
-      const [pacientesData, userData] = await Promise.all([
-        http.getPacientes(),
-        Promise.resolve(decodificarToken())
-      ]);
+      setLoading(true);
+      console.log('=== INICIANDO CARGA DE DATOS ===');
       
-      setPacientes(Array.isArray(pacientesData) ? pacientesData : []);
+      // Primero obtenemos los datos del usuario actual
+      const userData = decodificarToken();
+      console.log('Usuario actual cargado:', userData); // Debug
+      
+      if (!userData) {
+        console.error('No se pudo decodificar el token del usuario');
+        throw new Error('No se pudo obtener información del usuario logueado. Por favor, inicie sesión nuevamente.');
+      }
+      
       setEmpleadoActual(userData);
+      console.log('Empleado actual establecido:', userData);
+      
+      // Luego cargamos todos los pacientes (sin filtrar por centro médico)
+      console.log('=== CARGANDO PACIENTES ===');
+      
+      try {
+        const pacientesData = await http.getPacientes();
+        console.log('Respuesta cruda del backend para pacientes:', pacientesData);
+        
+        let pacientesArray = [];
+        
+        // Manejar diferentes estructuras de respuesta
+        if (Array.isArray(pacientesData)) {
+          pacientesArray = pacientesData;
+        } else if (pacientesData && Array.isArray(pacientesData.data)) {
+          pacientesArray = pacientesData.data;
+        } else if (pacientesData && Array.isArray(pacientesData.pacientes)) {
+          pacientesArray = pacientesData.pacientes;
+        } else {
+          console.warn('Estructura de respuesta de pacientes no reconocida:', pacientesData);
+        }
+        
+        console.log('Pacientes procesados:', pacientesArray);
+        console.log('Número de pacientes encontrados:', pacientesArray.length);
+        
+        setPacientes(pacientesArray);
+        
+        if (pacientesArray.length === 0) {
+          console.warn('No se encontraron pacientes en la respuesta del backend');
+        }
+        
+      } catch (pacientesError) {
+        console.error('Error específico cargando pacientes:', pacientesError);
+        setPacientes([]);
+        // No lanzamos el error para que no impida cargar el resto de la aplicación
+      }
+      
+      console.log('=== CARGA DE DATOS COMPLETADA ===');
+      
     } catch (error) {
-      console.error('Error cargando datos iniciales:', error);
+      console.error('Error general cargando datos iniciales:', error);
+      setError('Error al cargar datos iniciales: ' + error.message);
+      setPacientes([]);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -140,6 +204,8 @@ const Citas = () => {
     cargarCitas();
   }, [cargarDatosIniciales, cargarCitas]);
 
+
+
   const handleFiltroChange = (key, value) => {
     setFiltros(prev => ({
       ...prev,
@@ -149,8 +215,8 @@ const Citas = () => {
 
   const limpiarFiltros = () => {
     setFiltros({
-      fecha: '',
-      estado: '',
+      fechaDesde: '',
+      fechaHasta: '',
       medicoId: '',
       pacienteId: '',
       busqueda: ''
@@ -306,24 +372,42 @@ const Citas = () => {
 
 
   const citasFiltradas = citas.filter(cita => {
-    // Filtro por rango de fechas
-    if (filtros.fechaDesde && cita.fecha < filtros.fechaDesde) return false;
-    if (filtros.fechaHasta && cita.fecha > filtros.fechaHasta) return false;
+    // Filtro por rango de fechas (comparación de strings de fecha en formato YYYY-MM-DD)
+    if (filtros.fechaDesde && cita.fecha && cita.fecha < filtros.fechaDesde) return false;
+    if (filtros.fechaHasta && cita.fecha && cita.fecha > filtros.fechaHasta) return false;
     
     // Filtro por médico ID
-    if (filtros.medicoId && !cita.medicoId.toString().includes(filtros.medicoId)) return false;
+    if (filtros.medicoId && filtros.medicoId.trim() !== '') {
+      const medicoIdFiltro = filtros.medicoId.toLowerCase();
+      const medicoMatch = 
+        cita.medicoId?.toString().toLowerCase().includes(medicoIdFiltro) ||
+        cita.medicoNombre?.toLowerCase().includes(medicoIdFiltro);
+      if (!medicoMatch) return false;
+    }
     
-    // Filtro por búsqueda de texto
-    if (filtros.busqueda) {
+    // Filtro por paciente ID (si se agrega en el futuro)
+    if (filtros.pacienteId && filtros.pacienteId.trim() !== '') {
+      const pacienteIdFiltro = filtros.pacienteId.toLowerCase();
+      const pacienteMatch =
+        cita.pacienteId?.toString().toLowerCase().includes(pacienteIdFiltro) ||
+        cita.pacienteNombre?.toLowerCase().includes(pacienteIdFiltro) ||
+        cita.pacienteCedula?.toLowerCase().includes(pacienteIdFiltro);
+      if (!pacienteMatch) return false;
+    }
+    
+    // Filtro por búsqueda de texto general
+    if (filtros.busqueda && filtros.busqueda.trim() !== '') {
       const busqueda = filtros.busqueda.toLowerCase();
-      return (
+      const textoMatch = (
         cita.pacienteNombre?.toLowerCase().includes(busqueda) ||
+        cita.pacienteCedula?.toLowerCase().includes(busqueda) ||
         cita.especialidad?.toLowerCase().includes(busqueda) ||
         cita.motivo?.toLowerCase().includes(busqueda) ||
         cita.medicoNombre?.toLowerCase().includes(busqueda) ||
         cita.diagnostico?.toLowerCase().includes(busqueda) ||
         cita.tratamiento?.toLowerCase().includes(busqueda)
       );
+      if (!textoMatch) return false;
     }
     
     return true;
@@ -353,7 +437,7 @@ const Citas = () => {
           <h3 className="text-lg font-semibold text-gray-900">Filtros</h3>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Desde</label>
             <input
@@ -378,9 +462,20 @@ const Citas = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Médico</label>
             <input
               type="text"
-              placeholder="ID del médico"
+              placeholder="Nombre o ID"
               value={filtros.medicoId}
               onChange={(e) => handleFiltroChange('medicoId', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Paciente</label>
+            <input
+              type="text"
+              placeholder="Nombre o cédula"
+              value={filtros.pacienteId}
+              onChange={(e) => handleFiltroChange('pacienteId', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -391,7 +486,7 @@ const Citas = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Paciente, médico, diagnóstico..."
+                placeholder="Diagnóstico, motivo..."
                 value={filtros.busqueda}
                 onChange={(e) => handleFiltroChange('busqueda', e.target.value)}
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -402,7 +497,7 @@ const Citas = () => {
           <div className="flex items-end">
             <button
               onClick={limpiarFiltros}
-              className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
               Limpiar
             </button>
@@ -594,13 +689,23 @@ const Citas = () => {
                     disabled={modalMode === 'view'}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                   >
-                    <option value="">Seleccionar paciente</option>
-                    {pacientes.map((paciente) => (
-                      <option key={paciente.idPaciente} value={paciente.idPaciente}>
-                        {paciente.cedula} - {paciente.nombre}
-                      </option>
-                    ))}
+                    <option value="">
+                      {pacientes.length === 0 ? 'Cargando pacientes...' : 'Seleccionar paciente'}
+                    </option>
+                    {pacientes.length === 0 ? (
+                      <option disabled>No hay pacientes disponibles</option>
+                    ) : (
+                      pacientes.map((paciente) => (
+                        <option key={paciente.idPaciente} value={paciente.idPaciente}>
+                          {paciente.cedula} - {paciente.nombre}
+                        </option>
+                      ))
+                    )}
                   </select>
+                  {/* Debug info */}
+                  <div className="text-xs text-gray-500 mt-1">
+                    Debug: {pacientes.length} pacientes disponibles (todos los centros médicos)
+                  </div>
                 </div>
 
                 <div>

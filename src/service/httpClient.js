@@ -169,6 +169,7 @@ http.deleteCita = async (id, citaCompleta = null) => {
 
 // Métodos para obtener datos necesarios
 http.getPacientes = async () => {
+  console.log('Obteniendo todos los pacientes desde:', endpoints.pacientes); // Debug
   const response = await http.get(endpoints.pacientes);
   return response.data;
 };
