@@ -3,7 +3,7 @@ import {
   Calendar, Clock, User, Stethoscope, Search, Plus, Filter,
   Eye, Edit2, Trash2, X, Save, AlertCircle, CheckCircle
 } from 'lucide-react';
-import { apiService } from '../service/apiService';
+import { http } from '../service/httpClient';
 import { tokenUtils } from '../utils/TokenUtils';
 
 const Citas = () => {
@@ -73,7 +73,7 @@ const Citas = () => {
   const cargarDatosIniciales = useCallback(async () => {
     try {
       const [pacientesData, userData] = await Promise.all([
-        apiService.getPacientes(),
+        http.getPacientes(),
         Promise.resolve(decodificarToken())
       ]);
       
@@ -107,7 +107,7 @@ const Citas = () => {
   const cargarCitas = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await apiService.getCitas(filtros);
+      const response = await http.getCitas(filtros);
       
       // Verificar si la respuesta es un array o tiene estructura anidada
       let consultasArray = [];
@@ -246,14 +246,14 @@ const Citas = () => {
       console.log('Datos mapeados para backend:', datosParaBackend); // Debug
       
       if (modalMode === 'create') {
-        await apiService.createConsulta(datosParaBackend);
+        await http.createConsulta(datosParaBackend);
       } else if (modalMode === 'edit') {
         // Para editar, incluir el ID de la consulta
         const datosParaEditar = {
           ...datosParaBackend,
           idConsultaMedica: selectedCita.id
         };
-        await apiService.updateConsulta(selectedCita.id, datosParaEditar);
+        await http.updateConsulta(selectedCita.id, datosParaEditar);
       }
       
       await cargarCitas();
@@ -273,7 +273,26 @@ const Citas = () => {
   const eliminarCita = async () => {
     try {
       setSubmitting(true);
-      await apiService.deleteCita(citaToDelete.id);
+      
+      // Encontrar el paciente completo para el objeto de eliminación
+      const pacienteCompleto = pacientes.find(p => p.idPaciente === parseInt(citaToDelete.pacienteId));
+      
+      // Construir el objeto completo que espera el backend para eliminar
+      const consultaParaEliminar = {
+        idConsultaMedica: citaToDelete.id,
+        fecha: citaToDelete.fecha,
+        hora: citaToDelete.hora,
+        motivo: citaToDelete.motivo,
+        diagnostico: citaToDelete.diagnostico || '',
+        tratamiento: citaToDelete.tratamiento || '',
+        idMedico: parseInt(empleadoActual?.idEmpleado) || 0,
+        cedula: pacienteCompleto?.cedula || citaToDelete.pacienteCedula,
+        idCentroMedico: parseInt(empleadoActual?.idCentroMedico) || 0
+      };
+      
+      console.log('Eliminando consulta con objeto completo:', consultaParaEliminar); // Debug
+      
+      await http.deleteCita(citaToDelete.id, consultaParaEliminar);
       await cargarCitas();
       setShowDeleteConfirm(false);
       setCitaToDelete(null);
