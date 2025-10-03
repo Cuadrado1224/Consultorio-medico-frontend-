@@ -12,6 +12,7 @@ import {
   Book,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { tokenUtils } from "../utils/TokenUtils";
 import CentroMedico from "./CentroMedico";
 import Empleados from "./Empleados";
 import Resumen from "./Resumen";
@@ -23,17 +24,46 @@ import Logo from "../assets/Logo.png";
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
-  const [activeSection, setActiveSection] = useState("overview");
+  
+  // Función para determinar si el usuario es administrador
+  const esAdministrador = () => {
+    try {
+      const token = tokenUtils.get();
+      if (!token) return false;
+      
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const tipoEmpleadoID = payload.TipoEmpleadoID || payload.tipoEmpleadoID || 
+                            payload.TipoEmpleadoId || payload.tipoEmpleadoId ||
+                            (payload.TipoEmpleado === 'Administrador' ? 1 : 2) ||
+                            (payload.tipoEmpleado === 'Administrador' ? 1 : 2);
+      
+      return tipoEmpleadoID === 1;
+    } catch {
+      return false;
+    }
+  };
+  
+  // Inicializar sección activa según el rol
+  const [activeSection, setActiveSection] = useState(
+    esAdministrador() ? "overview" : "reports"
+  );
 
-  const menuItems = [
+  // Menús según el rol del usuario
+  const menuItemsAdmin = [
     { id: "resume", label: "Resumen", icon: BookOpen },
     { id: "employees", label: "Empleados", icon: Users },
     { id: "patients", label: "Centros Médicos", icon: Hospital },
-    { id: "reports", label: "Citas Medicas", icon: Calendar },
+    { id: "reports", label: "Citas Médicas", icon: Calendar },
     { id: "medical-records", label: "Reportes", icon: FileText },
     { id: "staff", label: "Personal", icon: Stethoscope },
-   
   ];
+
+  const menuItemsEmpleado = [
+    { id: "reports", label: "Citas Médicas", icon: Calendar },
+  ];
+
+  // Seleccionar el menú según el rol
+  const menuItems = esAdministrador() ? menuItemsAdmin : menuItemsEmpleado;
 
   const renderContent = () => {
     switch (activeSection) {
@@ -85,7 +115,9 @@ const Dashboard = () => {
       
       case "overview":
       default:
-        return <Resumen />;
+        // Si es empleado no-admin, mostrar Citas por defecto
+        // Si es admin, mostrar Resumen por defecto
+        return esAdministrador() ? <Resumen /> : <Citas />;
     }
   };
    const handleLogout = async () => {
@@ -154,10 +186,10 @@ const Dashboard = () => {
             <div className="flex items-center space-x-3">
               <div className="text-right">
                 <p className="text-xl font-semibold text-gray-900">
-                  {user?.name || "Dr. Usuario"}
+                  {user?.name || user?.username || "Usuario"}
                 </p>
                 <p className="text-lg text-gray-500">
-                  {user?.department || "Medicina General"}
+                  {user?.especialidad || user?.tipoEmpleado || "Empleado"}
                 </p>
               </div>
               <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">

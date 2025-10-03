@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Calendar, Clock, User, Stethoscope, Search, Plus, Filter,
   Eye, Edit2, Trash2, X, Save, AlertCircle, CheckCircle
 } from 'lucide-react';
 import { http } from '../service/httpClient';
 import { tokenUtils } from '../utils/TokenUtils';
+import { useAuth } from '../context/AuthContext';
 
 const Citas = () => {
+  const { user } = useAuth();
   const [citas, setCitas] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [empleadoActual, setEmpleadoActual] = useState(null);
@@ -43,28 +45,49 @@ const Citas = () => {
   // Estados de carga
   const [submitting, setSubmitting] = useState(false);
 
+  // Función para manejar redirección al login
+  const manejarErrorAutenticacion = () => {
+    tokenUtils.remove();
+    // Limpiar el contexto de autenticación
+    setError(null);
+    // Forzar redirección al login
+    window.location.href = '/login';
+  };
+
   // Función para decodificar JWT y obtener datos del usuario
   const decodificarToken = () => {
     try {
       const token = tokenUtils.get();
-      if (!token) return null;
+      if (!token) {
+        return null;
+      }
       
       const payload = JSON.parse(atob(token.split('.')[1]));
-      console.log('Payload del token:', payload); // Debug
-      
+      console.log('Payload del token completo:', payload); // Debug
+     
+      // Intentar múltiples variaciones de campos comunes
       const userData = {
-        idEmpleado: payload.IdEmpleado,
-        nombre: payload.unique_name,
-        especialidad: payload.Especialidad,
-        tipoEmpleado: payload.TipoEmpleado,
-        centroMedico: payload.CentroMedico,
-        idCentroMedico: payload.idCentroMedico || payload.IdCentroMedico || payload.centroMedicoId
+        idEmpleado: payload.IdEmpleado || payload.empleadoId || payload.id || payload.sub,
+        nombre: payload.unique_name || payload.name || payload.nombre || payload.usuario,
+        especialidad: payload.Especialidad || payload.especialidad,
+        tipoEmpleado: payload.TipoEmpleado || payload.tipoEmpleado || payload.role,
+        tipoEmpleadoID: payload.TipoEmpleadoID || payload.tipoEmpleadoID || payload.TipoEmpleadoId || payload.tipoEmpleadoId || 
+                        (payload.TipoEmpleado === 'Administrador' ? 1 : 2) || // Mapear desde tipoEmpleado si está disponible
+                        (payload.tipoEmpleado === 'Administrador' ? 1 : 2), // Backup mapping
+        centroMedico: payload.CentroMedico || payload.centroMedico,
+        idCentroMedico: payload.idCentroMedico || payload.IdCentroMedico || payload.centroMedicoId || payload.centroMedicoID
       };
       
-      console.log('Datos del usuario procesados:', userData); // Debug
+      
+
+      
+      // Validar que tenemos los datos mínimos necesarios
+      if (!userData.idEmpleado && !userData.nombre) {
+        return null;
+      }
+      
       return userData;
-    } catch (error) {
-      console.error('Error decodificando token:', error);
+    } catch {
       return null;
     }
   };
@@ -72,15 +95,42 @@ const Citas = () => {
   // Cargar datos iniciales
   const cargarDatosIniciales = useCallback(async () => {
     try {
-      const [pacientesData, userData] = await Promise.all([
-        http.getPacientes(),
-        Promise.resolve(decodificarToken())
-      ]);
+      setLoading(true);
+      const userData = decodificarToken();
       
-      setPacientes(Array.isArray(pacientesData) ? pacientesData : []);
+      if (!userData) {
+        throw new Error('No se pudo obtener información del usuario logueado. Por favor, inicie sesión nuevamente.');
+      }
+      
       setEmpleadoActual(userData);
+      
+      try {
+        const pacientesData = await http.getPacientes();
+        
+        let pacientesArray = [];
+        
+        // Manejar diferentes estructuras de respuesta
+        if (Array.isArray(pacientesData)) {
+          pacientesArray = pacientesData;
+        } else if (pacientesData && Array.isArray(pacientesData.data)) {
+          pacientesArray = pacientesData.data;
+        } else if (pacientesData && Array.isArray(pacientesData.pacientes)) {
+          pacientesArray = pacientesData.pacientes;
+        } else {
+          pacientesArray = [];
+        }
+        
+        setPacientes(pacientesArray);
+        
+      } catch {
+        setPacientes([]);
+      }
+      
     } catch (error) {
-      console.error('Error cargando datos iniciales:', error);
+      setError('Error al cargar datos iniciales: ' + error.message);
+      setPacientes([]);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -107,7 +157,24 @@ const Citas = () => {
   const cargarCitas = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await http.getCitas(filtros);
+      setError(null);
+      
+      // Aplicar filtro automático si el usuario no es administrador
+      const userData = decodificarToken();
+      let filtrosAplicados = { ...filtros };
+      
+      // Verificar si es administrador usando tipoEmpleadoID (1 = Administrador)
+      const esAdministrador = userData?.tipoEmpleadoID === 1;
+      
+      console.log('Usuario actual:', userData);
+      console.log('Es administrador?', esAdministrador);
+      console.log('Filtros aplicados:', filtrosAplicados);
+      
+      // *** REMOVIDO: No aplicamos filtro por médico en backend
+      // El filtro por rol se maneja en el frontend (citasFiltradas)
+      // Esto permite mejor debugging y control
+      
+      const response = await http.getCitas(filtrosAplicados);
       
       // Verificar si la respuesta es un array o tiene estructura anidada
       let consultasArray = [];
@@ -120,7 +187,6 @@ const Citas = () => {
       } else if (response && Array.isArray(response.consultas)) {
         consultasArray = response.consultas;
       } else {
-        console.log('Estructura de respuesta no reconocida:', response);
         consultasArray = [];
       }
       
@@ -128,17 +194,33 @@ const Citas = () => {
       setCitas(consultasMapeadas);
       setError(null);
     } catch (err) {
-      setError('Error al cargar las citas: ' + err.message);
+      if (err.message.includes('timeout') || err.message.includes('TIMEOUT_ERROR')) {
+        setError('🕰️ El servidor está tardando más de lo normal. Por favor intenta nuevamente.');
+      } else if (err.message.includes('NETWORK_ERROR')) {
+        setError('🌐 Error de conexión: Verifica tu conexión a internet e intenta nuevamente.');
+      } else {
+        setError('⚠️ Error al cargar las consultas: ' + err.message);
+      }
       setCitas([]);
     } finally {
       setLoading(false);
     }
   }, [filtros]);
 
+  // Cargar datos iniciales al montar el componente
   useEffect(() => {
     cargarDatosIniciales();
+  }, [cargarDatosIniciales]);
+
+  // Cargar citas inmediatamente al montar y cuando cambien los filtros
+  useEffect(() => {
     cargarCitas();
-  }, [cargarDatosIniciales, cargarCitas]);
+  }, [cargarCitas]);
+
+  // No necesitamos el useEffect adicional para empleadoActual 
+  // porque cargarCitas ya se ejecuta automáticamente
+
+
 
   const handleFiltroChange = (key, value) => {
     setFiltros(prev => ({
@@ -149,8 +231,8 @@ const Citas = () => {
 
   const limpiarFiltros = () => {
     setFiltros({
-      fecha: '',
-      estado: '',
+      fechaDesde: '',
+      fechaHasta: '',
       medicoId: '',
       pacienteId: '',
       busqueda: ''
@@ -216,9 +298,7 @@ const Citas = () => {
     try {
       setSubmitting(true);
       
-      // Validar datos antes de enviar
-      console.log('Form data original:', formData); // Debug
-      console.log('Empleado actual:', empleadoActual); // Debug
+    
       
       if (!formData.centroMedicoId) {
         throw new Error('No se puede determinar el centro médico. Por favor, inicie sesión nuevamente.');
@@ -243,7 +323,7 @@ const Citas = () => {
         idCentroMedico: parseInt(formData.centroMedicoId) || 0
       };
       
-      console.log('Datos mapeados para backend:', datosParaBackend); // Debug
+     
       
       if (modalMode === 'create') {
         await http.createConsulta(datosParaBackend);
@@ -290,7 +370,7 @@ const Citas = () => {
         idCentroMedico: parseInt(empleadoActual?.idCentroMedico) || 0
       };
       
-      console.log('Eliminando consulta con objeto completo:', consultaParaEliminar); // Debug
+    
       
       await http.deleteCita(citaToDelete.id, consultaParaEliminar);
       await cargarCitas();
@@ -305,37 +385,84 @@ const Citas = () => {
 
 
 
-  const citasFiltradas = citas.filter(cita => {
-    // Filtro por rango de fechas
-    if (filtros.fechaDesde && cita.fecha < filtros.fechaDesde) return false;
-    if (filtros.fechaHasta && cita.fecha > filtros.fechaHasta) return false;
+  // Optimización con useMemo para evitar recalcular filtros innecesariamente
+  const citasFiltradas = useMemo(() => {
+    console.log('Todas las citas cargadas:', citas);
+    console.log('Empleado actual para filtros:', empleadoActual);
+    
+    return citas.filter(cita => {
+      // FILTRO POR ROL: Solo aplicar para empleados NO administradores
+      // Los administradores (tipoEmpleadoID === 1) ven TODAS las citas
+      if (empleadoActual && empleadoActual.tipoEmpleadoID !== 1) {
+        // Para empleados no-admin: solo mostrar citas donde ellos son el médico
+        console.log('Aplicando filtro de empleado. Cita médico ID:', cita.medicoId, 'Empleado ID:', empleadoActual.idEmpleado);
+        
+        if (cita.medicoId !== empleadoActual.idEmpleado && 
+            cita.medicoId?.toString() !== empleadoActual.idEmpleado?.toString()) {
+          console.log('Cita filtrada - no coincide médico ID');
+          return false;
+        }
+      }
+
+      // Filtro por rango de fechas (comparación de strings de fecha en formato YYYY-MM-DD)
+      if (filtros.fechaDesde && cita.fecha && cita.fecha < filtros.fechaDesde) return false;
+      if (filtros.fechaHasta && cita.fecha && cita.fecha > filtros.fechaHasta) return false;
     
     // Filtro por médico ID
-    if (filtros.medicoId && !cita.medicoId.toString().includes(filtros.medicoId)) return false;
+    if (filtros.medicoId && filtros.medicoId.trim() !== '') {
+      const medicoIdFiltro = filtros.medicoId.toLowerCase();
+      const medicoMatch = 
+        cita.medicoId?.toString().toLowerCase().includes(medicoIdFiltro) ||
+        cita.medicoNombre?.toLowerCase().includes(medicoIdFiltro);
+      if (!medicoMatch) return false;
+    }
     
-    // Filtro por búsqueda de texto
-    if (filtros.busqueda) {
+    // Filtro por paciente ID (si se agrega en el futuro)
+    if (filtros.pacienteId && filtros.pacienteId.trim() !== '') {
+      const pacienteIdFiltro = filtros.pacienteId.toLowerCase();
+      const pacienteMatch =
+        cita.pacienteId?.toString().toLowerCase().includes(pacienteIdFiltro) ||
+        cita.pacienteNombre?.toLowerCase().includes(pacienteIdFiltro) ||
+        cita.pacienteCedula?.toLowerCase().includes(pacienteIdFiltro);
+      if (!pacienteMatch) return false;
+    }
+    
+    // Filtro por búsqueda de texto general
+    if (filtros.busqueda && filtros.busqueda.trim() !== '') {
       const busqueda = filtros.busqueda.toLowerCase();
-      return (
+      const textoMatch = (
         cita.pacienteNombre?.toLowerCase().includes(busqueda) ||
+        cita.pacienteCedula?.toLowerCase().includes(busqueda) ||
         cita.especialidad?.toLowerCase().includes(busqueda) ||
         cita.motivo?.toLowerCase().includes(busqueda) ||
         cita.medicoNombre?.toLowerCase().includes(busqueda) ||
         cita.diagnostico?.toLowerCase().includes(busqueda) ||
         cita.tratamiento?.toLowerCase().includes(busqueda)
       );
+      if (!textoMatch) return false;
     }
     
     return true;
-  });
+    });
+  }, [citas, filtros, empleadoActual]);
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Citas</h1>
-          <p className="text-gray-600">Administra las citas médicas del consultorio</p>
+          <h1 className="text-2xl font-bold text-gray-900">Gestión de Citas Médicas</h1>
+          <p className="text-gray-600">
+            {empleadoActual && empleadoActual.tipoEmpleadoID === 1
+              ? "Administra todas las citas médicas del consultorio" 
+              : `🩺 Consultas médicas de ${empleadoActual?.nombre || user?.name || 'tu cuenta'}`}
+          </p>
+          {empleadoActual && (
+            <p className="text-sm text-gray-500 mt-1">
+               {empleadoActual.tipoEmpleadoID === 1 ? 'Tipo de empleado: Administrador' : 'Especialidad:'} {empleadoActual.especialidad || 'N/A'}
+              
+            </p>
+          )}
         </div>
         <button 
           onClick={() => abrirModal('create')}
@@ -348,12 +475,19 @@ const Citas = () => {
 
       {/* Filtros */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <div className="flex items-center space-x-2 mb-4">
-          <Filter className="w-5 h-5 text-gray-600" />
-          <h3 className="text-lg font-semibold text-gray-900">Filtros</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <Filter className="w-5 h-5 text-gray-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Filtros</h3>
+          </div>
+          {empleadoActual && empleadoActual.tipoEmpleadoID !== 1 && (
+            <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+             
+            </div>
+          )}
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className={`grid gap-3 ${empleadoActual && empleadoActual.tipoEmpleadoID === 1 ? 'grid-cols-6' : 'grid-cols-5'}`}>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Desde</label>
             <input
@@ -374,13 +508,27 @@ const Citas = () => {
             />
           </div>
           
+          {/* Solo mostrar filtro por médico si es administrador */}
+          {empleadoActual && empleadoActual.tipoEmpleadoID === 1 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Médico</label>
+              <input
+                type="text"
+                placeholder="Nombre o ID"
+                value={filtros.medicoId}
+                onChange={(e) => handleFiltroChange('medicoId', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          )}
+          
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Médico</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Paciente</label>
             <input
               type="text"
-              placeholder="ID del médico"
-              value={filtros.medicoId}
-              onChange={(e) => handleFiltroChange('medicoId', e.target.value)}
+              placeholder="Nombre o cédula"
+              value={filtros.pacienteId}
+              onChange={(e) => handleFiltroChange('pacienteId', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -391,7 +539,7 @@ const Citas = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Paciente, médico, diagnóstico..."
+                placeholder="Diagnóstico, motivo..."
                 value={filtros.busqueda}
                 onChange={(e) => handleFiltroChange('busqueda', e.target.value)}
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -402,7 +550,7 @@ const Citas = () => {
           <div className="flex items-end">
             <button
               onClick={limpiarFiltros}
-              className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
               Limpiar
             </button>
@@ -410,20 +558,14 @@ const Citas = () => {
         </div>
       </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-2">
-          <AlertCircle className="w-5 h-5 text-red-600" />
-          <span className="text-red-700">{error}</span>
-        </div>
-      )}
+     
 
       {/* Lista de Citas */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         {loading ? (
           <div className="p-8 text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-600 mt-4">Cargando citas...</p>
+            <p className="text-gray-600 mt-4">Cargando</p>
           </div>
         ) : citasFiltradas.length === 0 ? (
           <div className="p-8 text-center">
@@ -477,7 +619,7 @@ const Citas = () => {
                             {cita.pacienteNombre}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {cita.pacienteTelefono}
+                            {cita.pacienteCedula}
                           </div>
                         </div>
                       </div>
@@ -594,13 +736,20 @@ const Citas = () => {
                     disabled={modalMode === 'view'}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                   >
-                    <option value="">Seleccionar paciente</option>
-                    {pacientes.map((paciente) => (
-                      <option key={paciente.idPaciente} value={paciente.idPaciente}>
-                        {paciente.cedula} - {paciente.nombre}
-                      </option>
-                    ))}
+                    <option value="">
+                      {pacientes.length === 0 ? 'Cargando pacientes...' : 'Seleccionar paciente'}
+                    </option>
+                    {pacientes.length === 0 ? (
+                      <option disabled>No hay pacientes disponibles</option>
+                    ) : (
+                      pacientes.map((paciente) => (
+                        <option key={paciente.idPaciente} value={paciente.idPaciente}>
+                          {paciente.cedula} - {paciente.nombre}
+                        </option>
+                      ))
+                    )}
                   </select>
+                  
                 </div>
 
                 <div>
