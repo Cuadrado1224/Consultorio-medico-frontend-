@@ -5,10 +5,11 @@ import {
   Users,
   Calendar,
   FileText,
-  Bell,
+  BookOpen,
   Settings,
   LogOut,
   Stethoscope,
+  Book,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import CentroMedico from "./CentroMedico";
@@ -17,7 +18,7 @@ import Resumen from "./Resumen";
 import Reportes from "./Reportes";
 import Citas from "./Citas";
 import Personal from "./Personal"; // agregado
-
+import Swal from "sweetalert2";
 import Logo from "../assets/Logo.png";
 
 const Dashboard = () => {
@@ -25,10 +26,11 @@ const Dashboard = () => {
   const [activeSection, setActiveSection] = useState("overview");
 
   const menuItems = [
+    { id: "resume", label: "Resumen", icon: BookOpen },
     { id: "employees", label: "Empleados", icon: Users },
     { id: "patients", label: "Centros Médicos", icon: Hospital },
-    { id: "reports", label: "Reportes", icon: Calendar },
-    { id: "medical-records", label: "Historiales", icon: FileText },
+    { id: "reports", label: "Citas Medicas", icon: Calendar },
+    { id: "medical-records", label: "Reportes", icon: FileText },
     { id: "staff", label: "Personal", icon: Stethoscope },
    
   ];
@@ -49,6 +51,11 @@ const Dashboard = () => {
         );
 
       case "reports":
+        return (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <Citas />
+            </div>
+        );
 
       case "appointments":
         return (
@@ -69,12 +76,61 @@ const Dashboard = () => {
             <Personal />
           </div>
         );
+      case "resume":
+        return (
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <Resumen />
+          </div>
+        );
       
       case "overview":
       default:
         return <Resumen />;
     }
   };
+   const handleLogout = async () => {
+      try {
+        const result = await Swal.fire({
+          title: "¿Estás seguro?",
+          text: "¿Quieres cerrar sesión`?",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonColor: "#3085d6",
+          cancelButtonColor: "#d33",
+          confirmButtonText: "Sí, cerrar sesión",
+          cancelButtonText: "Cancelar",
+        });
+        if (result.isConfirmed) {
+          await logout();
+          Swal.fire({
+            toast: true,
+            position: "top-end",
+            showConfirmButton: false,
+            timer: 1000,
+            timerProgressBar: true,
+            background: "#e8f5e9",
+            color: "#2e7d32",
+            iconColor: "#4caf50",
+            title: "Sesión cerrada correctamente!",
+            icon: "success",
+          });
+        }
+      } catch (e) {
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          showConfirmButton: false,
+          timer: 2000,
+          timerProgressBar: true,
+          background: "#ffebee",
+          color: "#b71c1c",
+          iconColor: "#d32f2f",
+          title: e?.response?.data?.message || "Error al cerrar sesión",
+          icon: "error",
+        });
+      }
+    };
+  
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -117,7 +173,7 @@ const Dashboard = () => {
             </div>
 
             <button
-              onClick={logout}
+              onClick={handleLogout}
               className="p-6 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full"
               title="Cerrar sesión"
             >

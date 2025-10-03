@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { http } from '../service/httpClient';
 import { 
-  Heart,Hospital, Users, Calendar, Activity, UserPlus, FileText, 
-  Bell, Settings, LogOut, Stethoscope, Bed, Clock, TrendingUp, Loader2 
+ Users, Calendar, Activity, UserPlus, FileText, 
+   Bed, Clock, TrendingUp 
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const Resumen = () => {
+ 
   const defaultStats = [
     {
       title: 'Pacientes Hoy',
@@ -186,9 +188,10 @@ const Resumen = () => {
                   <h2 className="text-lg font-semibold text-gray-900">Acciones Rápidas</h2>
                 </div>
                 <div className="p-6 space-y-3">
-                  <button className="w-full flex items-center space-x-3 p-3 text-left hover:bg-blue-50 rounded-lg transition-colors">
+                  <button className="w-full flex items-center space-x-3 p-3 text-left hover:bg-blue-50 rounded-lg transition-colors"  >
                     <UserPlus className="w-5 h-5 text-blue-600" />
-                    <span className="font-medium">Registrar Paciente</span>
+                    <span className="font-medium">Registrar Empleado</span>
+                    
                   </button>
                   <button className="w-full flex items-center space-x-3 p-3 text-left hover:bg-green-50 rounded-lg transition-colors">
                     <Calendar className="w-5 h-5 text-green-600" />
