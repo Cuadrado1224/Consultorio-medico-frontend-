@@ -61,8 +61,6 @@ const Login = () => {
         Toast.fire({
           title: "Inicio de sesión correcto!",
           icon: "success",
-        }).then(() => {
-          navigate("/");
         });
       }
     } catch (err) {
