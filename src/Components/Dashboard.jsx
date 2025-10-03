@@ -27,7 +27,7 @@ const Dashboard = () => {
     { id: "reports", label: "Reportes", icon: Calendar },
     { id: "medical-records", label: "Historiales", icon: FileText },
     { id: "staff", label: "Personal", icon: Stethoscope },
-    { id: "settings", label: "Configuración", icon: Settings },
+   
   ];
 
   const renderContent = () => {
@@ -59,15 +59,7 @@ const Dashboard = () => {
             </p>
           </div>
         );
-      case "settings":
-        return (
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h1 className="text-xl font-semibold mb-2">Configuración</h1>
-            <p className="text-gray-600 text-sm">
-              Preferencias de la aplicación.
-            </p>
-          </div>
-        );
+      
       case "overview":
       default:
         return <Resumen />;
