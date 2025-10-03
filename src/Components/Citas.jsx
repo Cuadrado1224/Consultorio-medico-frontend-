@@ -5,8 +5,10 @@ import {
 } from 'lucide-react';
 import { http } from '../service/httpClient';
 import { tokenUtils } from '../utils/TokenUtils';
+import { useAuth } from '../context/AuthContext';
 
 const Citas = () => {
+  const { user } = useAuth();
   const [citas, setCitas] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [empleadoActual, setEmpleadoActual] = useState(null);
@@ -63,6 +65,7 @@ const Citas = () => {
         nombre: payload.unique_name || payload.name || payload.nombre || payload.usuario,
         especialidad: payload.Especialidad || payload.especialidad,
         tipoEmpleado: payload.TipoEmpleado || payload.tipoEmpleado || payload.role,
+        tipoEmpleadoID: payload.TipoEmpleadoID || payload.tipoEmpleadoID || payload.TipoEmpleadoId || payload.tipoEmpleadoId,
         centroMedico: payload.CentroMedico || payload.centroMedico,
         idCentroMedico: payload.idCentroMedico || payload.IdCentroMedico || payload.centroMedicoId || payload.centroMedicoID
       };
@@ -171,7 +174,26 @@ const Citas = () => {
   const cargarCitas = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await http.getCitas(filtros);
+      setError(null);
+      
+      // Aplicar filtro automático si el usuario no es administrador
+      const userData = decodificarToken();
+      let filtrosAplicados = { ...filtros };
+      
+      // Verificar si es administrador usando tipoEmpleadoID (1 = Administrador)
+      const esAdministrador = userData?.tipoEmpleadoID === 1;
+      
+      if (userData && !esAdministrador) {
+        // Si no es administrador, filtrar solo sus consultas
+        filtrosAplicados.medicoId = userData.idEmpleado;
+        console.log('🔒 Usuario no administrador detectado (tipoEmpleadoID:', userData.tipoEmpleadoID, '). Filtrando consultas del empleado:', userData.idEmpleado);
+      } else {
+        console.log('👑 Usuario administrador detectado (tipoEmpleadoID:', userData?.tipoEmpleadoID, '). Mostrando todas las consultas.');
+      }
+      
+      console.log('📡 Enviando solicitud con filtros:', filtrosAplicados);
+      const response = await http.getCitas(filtrosAplicados);
+      console.log('✅ Respuesta recibida de consultas:', response);
       
       // Verificar si la respuesta es un array o tiene estructura anidada
       let consultasArray = [];
@@ -189,10 +211,18 @@ const Citas = () => {
       }
       
       const consultasMapeadas = consultasArray.map(mapearConsulta);
+      console.log('📋 Consultas mapeadas:', consultasMapeadas.length, 'consultas procesadas');
       setCitas(consultasMapeadas);
       setError(null);
     } catch (err) {
-      setError('Error al cargar las citas: ' + err.message);
+      console.error('❌ Error cargando citas:', err);
+      if (err.message.includes('timeout')) {
+        setError('Timeout: El servidor está tardando demasiado en responder. Intenta nuevamente.');
+      } else if (err.message.includes('NETWORK_ERROR')) {
+        setError('Error de conectividad: No se puede conectar con el servidor.');
+      } else {
+        setError('Error al cargar las citas: ' + err.message);
+      }
       setCitas([]);
     } finally {
       setLoading(false);
@@ -419,7 +449,16 @@ const Citas = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Gestión de Citas</h1>
-          <p className="text-gray-600">Administra las citas médicas del consultorio</p>
+          <p className="text-gray-600">
+            {empleadoActual && empleadoActual.tipoEmpleadoID === 1
+              ? "👑 Administra todas las citas médicas del consultorio" 
+              : `🩺 Consultas médicas de ${empleadoActual?.nombre || user?.name || 'tu cuenta'}`}
+          </p>
+          {empleadoActual && (
+            <p className="text-sm text-gray-500 mt-1">
+              Tipo de empleado: {empleadoActual.tipoEmpleadoID === 1 ? 'Administrador' : 'Empleado'} (ID: {empleadoActual.tipoEmpleadoID})
+            </p>
+          )}
         </div>
         <button 
           onClick={() => abrirModal('create')}
@@ -432,12 +471,19 @@ const Citas = () => {
 
       {/* Filtros */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <div className="flex items-center space-x-2 mb-4">
-          <Filter className="w-5 h-5 text-gray-600" />
-          <h3 className="text-lg font-semibold text-gray-900">Filtros</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <Filter className="w-5 h-5 text-gray-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Filtros</h3>
+          </div>
+          {empleadoActual && empleadoActual.tipoEmpleadoID !== 1 && (
+            <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+              🔒 Consultas personales
+            </div>
+          )}
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                <div className={`grid grid-cols-1 gap-3 ${empleadoActual && empleadoActual.tipoEmpleadoID === 1 ? 'md:grid-cols-6' : 'md:grid-cols-5'}`}>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Desde</label>
             <input
@@ -458,16 +504,19 @@ const Citas = () => {
             />
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Médico</label>
-            <input
-              type="text"
-              placeholder="Nombre o ID"
-              value={filtros.medicoId}
-              onChange={(e) => handleFiltroChange('medicoId', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+          {/* Solo mostrar filtro por médico si es administrador */}
+          {empleadoActual && empleadoActual.tipoEmpleadoID === 1 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Médico</label>
+              <input
+                type="text"
+                placeholder="Nombre o ID"
+                value={filtros.medicoId}
+                onChange={(e) => handleFiltroChange('medicoId', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          )}
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Paciente</label>
@@ -507,9 +556,18 @@ const Citas = () => {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-2">
-          <AlertCircle className="w-5 h-5 text-red-600" />
-          <span className="text-red-700">{error}</span>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center space-x-2 mb-2">
+            <AlertCircle className="w-5 h-5 text-red-600" />
+            <span className="text-red-700 font-medium">Error de Conexión</span>
+          </div>
+          <p className="text-red-700 mb-3">{error}</p>
+          <button
+            onClick={() => cargarCitas()}
+            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
+          >
+            Reintentar
+          </button>
         </div>
       )}
 

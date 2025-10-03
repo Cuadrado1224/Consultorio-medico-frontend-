@@ -37,6 +37,10 @@ export const AuthProvider = ({ children }) => {
         email: data?.email || '',
         roles: data?.roles || [],
         permisos: data?.permisos || [],
+        tipoEmpleado: data?.tipoEmpleado || '',
+        tipoEmpleadoID: data?.tipoEmpleadoID || null,
+        idEmpleado: data?.idEmpleado || '',
+        especialidad: data?.especialidad || ''
       };
     
       const roles = data?.roles || userData.roles || [];
@@ -73,8 +77,19 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
   };
 
+  const isAdmin = () => {
+    // Verificar por ID del tipo de empleado (1 = Administrador)
+    if (user?.tipoEmpleadoID === 1) return true;
+    // Fallback: verificar por texto del tipo de empleado
+    if (user?.tipoEmpleado) {
+      const tipo = user.tipoEmpleado.toLowerCase();
+      return tipo.includes('administrador') || tipo === 'admin';
+    }
+    return false;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );
