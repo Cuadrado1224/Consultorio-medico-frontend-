@@ -154,10 +154,10 @@ const Dashboard = () => {
             <div className="flex items-center space-x-3">
               <div className="text-right">
                 <p className="text-xl font-semibold text-gray-900">
-                  {user?.name || "Dr. Usuario"}
+                  {user?.name || user?.username || "Usuario"}
                 </p>
                 <p className="text-lg text-gray-500">
-                  {user?.department || "Medicina General"}
+                  {user?.especialidad || user?.tipoEmpleado || "Empleado"}
                 </p>
               </div>
               <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { tokenUtils } from '../utils/TokenUtils';
 import { http } from '../service/httpClient';
 
@@ -17,6 +17,49 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(tokenUtils.get());
   const [isAuthenticated, setIsAuthenticated] = useState(!!token);
 
+  // Función para decodificar el token y extraer la información del usuario
+  const decodeTokenToUser = (tokenString) => {
+    try {
+      if (!tokenString) return null;
+      
+      const payload = JSON.parse(atob(tokenString.split('.')[1]));
+      
+      return {
+        username: payload.unique_name || payload.name || payload.nombre || payload.usuario || 'Usuario',
+        name: payload.unique_name || payload.name || payload.nombre || payload.usuario || 'Usuario',
+        email: payload.email || payload.Email || '',
+        roles: payload.roles || [],
+        permisos: payload.permisos || [],
+        tipoEmpleado: payload.TipoEmpleado || payload.tipoEmpleado || payload.role || '',
+        tipoEmpleadoID: payload.TipoEmpleadoID || payload.tipoEmpleadoID || payload.TipoEmpleadoId || payload.tipoEmpleadoId || null,
+        idEmpleado: payload.IdEmpleado || payload.empleadoId || payload.id || payload.sub || '',
+        especialidad: payload.Especialidad || payload.especialidad || 'Sin especialidad',
+        centroMedico: payload.CentroMedico || payload.centroMedico || '',
+        idCentroMedico: payload.idCentroMedico || payload.IdCentroMedico || payload.centroMedicoId || payload.centroMedicoID || null
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  // Inicializar el usuario desde el token al cargar la página
+  useEffect(() => {
+    const storedToken = tokenUtils.get();
+    if (storedToken && !user) {
+      const decodedUser = decodeTokenToUser(storedToken);
+      if (decodedUser) {
+        setUser(decodedUser);
+        setToken(storedToken);
+        setIsAuthenticated(true);
+      } else {
+        // Token inválido, limpiar todo
+        tokenUtils.remove();
+        setToken(null);
+        setIsAuthenticated(false);
+      }
+    }
+  }, [user]);
+
   const login = async (credentials, remember = false) => {
     try {
       const { data, status } = await http.post('login', credentials, {
@@ -31,7 +74,8 @@ export const AuthProvider = ({ children }) => {
       if (typeof token === 'string') token = token.trim();
       if (!token) throw new Error('SIN_TOKEN');
 
-      const userData = data?.user || {
+      // Decodificar el token para obtener la información del usuario
+      const userData = decodeTokenToUser(token) || {
         username: credentials.nombreUsuario,
         name: data?.nombre || credentials.nombreUsuario,
         email: data?.email || '',

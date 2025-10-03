@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Calendar, Clock, User, Stethoscope, Search, Plus, Filter,
   Eye, Edit2, Trash2, X, Save, AlertCircle, CheckCircle
@@ -50,14 +50,10 @@ const Citas = () => {
     try {
       const token = tokenUtils.get();
       if (!token) {
-        console.log('No hay token disponible');
         return null;
       }
       
-      console.log('Token crudo:', token);
-      
       const payload = JSON.parse(atob(token.split('.')[1]));
-      console.log('Payload completo del token:', payload); // Debug detallado
       
       // Intentar múltiples variaciones de campos comunes
       const userData = {
@@ -70,19 +66,15 @@ const Citas = () => {
         idCentroMedico: payload.idCentroMedico || payload.IdCentroMedico || payload.centroMedicoId || payload.centroMedicoID
       };
       
-      console.log('Datos del usuario procesados:', userData); // Debug
-      console.log('ID Centro Médico encontrado:', userData.idCentroMedico);
+
       
       // Validar que tenemos los datos mínimos necesarios
       if (!userData.idEmpleado && !userData.nombre) {
-        console.error('Token no contiene datos de empleado válidos');
-        console.error('Campos disponibles en payload:', Object.keys(payload));
         return null;
       }
       
       return userData;
-    } catch (error) {
-      console.error('Error decodificando token:', error);
+    } catch {
       return null;
     }
   };
@@ -91,26 +83,16 @@ const Citas = () => {
   const cargarDatosIniciales = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('=== INICIANDO CARGA DE DATOS ===');
-      
-      // Primero obtenemos los datos del usuario actual
       const userData = decodificarToken();
-      console.log('Usuario actual cargado:', userData); // Debug
       
       if (!userData) {
-        console.error('No se pudo decodificar el token del usuario');
         throw new Error('No se pudo obtener información del usuario logueado. Por favor, inicie sesión nuevamente.');
       }
       
       setEmpleadoActual(userData);
-      console.log('Empleado actual establecido:', userData);
-      
-      // Luego cargamos todos los pacientes (sin filtrar por centro médico)
-      console.log('=== CARGANDO PACIENTES ===');
       
       try {
         const pacientesData = await http.getPacientes();
-        console.log('Respuesta cruda del backend para pacientes:', pacientesData);
         
         let pacientesArray = [];
         
@@ -122,28 +104,16 @@ const Citas = () => {
         } else if (pacientesData && Array.isArray(pacientesData.pacientes)) {
           pacientesArray = pacientesData.pacientes;
         } else {
-          console.warn('Estructura de respuesta de pacientes no reconocida:', pacientesData);
+          pacientesArray = [];
         }
-        
-        console.log('Pacientes procesados:', pacientesArray);
-        console.log('Número de pacientes encontrados:', pacientesArray.length);
         
         setPacientes(pacientesArray);
         
-        if (pacientesArray.length === 0) {
-          console.warn('No se encontraron pacientes en la respuesta del backend');
-        }
-        
-      } catch (pacientesError) {
-        console.error('Error específico cargando pacientes:', pacientesError);
+      } catch {
         setPacientes([]);
-        // No lanzamos el error para que no impida cargar el resto de la aplicación
       }
       
-      console.log('=== CARGA DE DATOS COMPLETADA ===');
-      
     } catch (error) {
-      console.error('Error general cargando datos iniciales:', error);
       setError('Error al cargar datos iniciales: ' + error.message);
       setPacientes([]);
     } finally {
@@ -184,16 +154,10 @@ const Citas = () => {
       const esAdministrador = userData?.tipoEmpleadoID === 1;
       
       if (userData && !esAdministrador) {
-        // Si no es administrador, filtrar solo sus consultas
         filtrosAplicados.medicoId = userData.idEmpleado;
-        console.log('🔒 Usuario no administrador detectado (tipoEmpleadoID:', userData.tipoEmpleadoID, '). Filtrando consultas del empleado:', userData.idEmpleado);
-      } else {
-        console.log('👑 Usuario administrador detectado (tipoEmpleadoID:', userData?.tipoEmpleadoID, '). Mostrando todas las consultas.');
       }
       
-      console.log('📡 Enviando solicitud con filtros:', filtrosAplicados);
       const response = await http.getCitas(filtrosAplicados);
-      console.log('✅ Respuesta recibida de consultas:', response);
       
       // Verificar si la respuesta es un array o tiene estructura anidada
       let consultasArray = [];
@@ -206,16 +170,13 @@ const Citas = () => {
       } else if (response && Array.isArray(response.consultas)) {
         consultasArray = response.consultas;
       } else {
-        console.log('Estructura de respuesta no reconocida:', response);
         consultasArray = [];
       }
       
       const consultasMapeadas = consultasArray.map(mapearConsulta);
-      console.log('📋 Consultas mapeadas:', consultasMapeadas.length, 'consultas procesadas');
       setCitas(consultasMapeadas);
       setError(null);
     } catch (err) {
-      console.error('❌ Error cargando citas:', err);
       if (err.message.includes('timeout')) {
         setError('Timeout: El servidor está tardando demasiado en responder. Intenta nuevamente.');
       } else if (err.message.includes('NETWORK_ERROR')) {
@@ -231,8 +192,13 @@ const Citas = () => {
 
   useEffect(() => {
     cargarDatosIniciales();
-    cargarCitas();
-  }, [cargarDatosIniciales, cargarCitas]);
+  }, [cargarDatosIniciales]);
+
+  useEffect(() => {
+    if (empleadoActual) {
+      cargarCitas();
+    }
+  }, [cargarCitas, empleadoActual]);
 
 
 
@@ -401,7 +367,8 @@ const Citas = () => {
 
 
 
-  const citasFiltradas = citas.filter(cita => {
+  // Optimización con useMemo para evitar recalcular filtros innecesariamente
+  const citasFiltradas = useMemo(() => citas.filter(cita => {
     // Filtro por rango de fechas (comparación de strings de fecha en formato YYYY-MM-DD)
     if (filtros.fechaDesde && cita.fecha && cita.fecha < filtros.fechaDesde) return false;
     if (filtros.fechaHasta && cita.fecha && cita.fecha > filtros.fechaHasta) return false;
@@ -441,7 +408,7 @@ const Citas = () => {
     }
     
     return true;
-  });
+  }), [citas, filtros]);
 
   return (
     <div className="space-y-6">
@@ -456,7 +423,7 @@ const Citas = () => {
           </p>
           {empleadoActual && (
             <p className="text-sm text-gray-500 mt-1">
-              Tipo de empleado: {empleadoActual.tipoEmpleadoID === 1 ? 'Administrador' : 'Empleado'} (ID: {empleadoActual.tipoEmpleadoID})
+              Tipo de empleado: {empleadoActual.tipoEmpleadoID === 1 ? 'Administrador' : 'Empleado'}
             </p>
           )}
         </div>
@@ -478,7 +445,7 @@ const Citas = () => {
           </div>
           {empleadoActual && empleadoActual.tipoEmpleadoID !== 1 && (
             <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-              🔒 Consultas personales
+             
             </div>
           )}
         </div>
@@ -576,7 +543,12 @@ const Citas = () => {
         {loading ? (
           <div className="p-8 text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-600 mt-4">Cargando citas...</p>
+            <p className="text-gray-600 mt-4">
+              {empleadoActual && empleadoActual.tipoEmpleadoID === 1 
+                ? 'Cargando todas las consultas...' 
+                : 'Cargando tus consultas...'}
+            </p>
+            <p className="text-gray-500 text-sm mt-2">Timeout extendido a 30 segundos</p>
           </div>
         ) : citasFiltradas.length === 0 ? (
           <div className="p-8 text-center">
@@ -630,7 +602,7 @@ const Citas = () => {
                             {cita.pacienteNombre}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {cita.pacienteTelefono}
+                            {cita.pacienteCedula}
                           </div>
                         </div>
                       </div>
