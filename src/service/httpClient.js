@@ -14,7 +14,11 @@ const endpoints = {
 
 export const http = axios.create({
   baseURL,
-  timeout: 30000
+  timeout: 8000, // 8 segundos - balance entre rapidez y estabilidad
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
 });
 
 http.interceptors.request.use((req) => {
@@ -31,10 +35,13 @@ http.interceptors.response.use(
   (error) => {
     if (error.response) {
       const { status, data } = error.response;
-      const snippet = typeof data === 'string' ? data.slice(0, 200) : JSON.stringify(data).slice(0, 200);
+      const snippet = typeof data === 'string' ? data.slice(0, 100) : JSON.stringify(data).slice(0, 100);
       return Promise.reject(new Error(`HTTP ${status}: ${snippet}`));
     }
     if (error.request) {
+      if (error.code === 'ECONNABORTED') {
+        return Promise.reject(new Error(`TIMEOUT_ERROR: El servidor tardó más de 8 segundos en responder`));
+      }
       return Promise.reject(new Error(`NETWORK_ERROR: Sin respuesta del servidor`));
     }
     return Promise.reject(new Error(`REQUEST_ERROR: ${error.message}`));

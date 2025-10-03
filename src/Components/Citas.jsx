@@ -45,6 +45,15 @@ const Citas = () => {
   // Estados de carga
   const [submitting, setSubmitting] = useState(false);
 
+  // Función para manejar redirección al login
+  const manejarErrorAutenticacion = () => {
+    tokenUtils.remove();
+    // Limpiar el contexto de autenticación
+    setError(null);
+    // Forzar redirección al login
+    window.location.href = '/login';
+  };
+
   // Función para decodificar JWT y obtener datos del usuario
   const decodificarToken = () => {
     try {
@@ -177,12 +186,12 @@ const Citas = () => {
       setCitas(consultasMapeadas);
       setError(null);
     } catch (err) {
-      if (err.message.includes('timeout')) {
-        setError('Timeout: El servidor está tardando demasiado en responder. Intenta nuevamente.');
+      if (err.message.includes('timeout') || err.message.includes('TIMEOUT_ERROR')) {
+        setError('🕰️ El servidor está tardando más de lo normal. Por favor intenta nuevamente.');
       } else if (err.message.includes('NETWORK_ERROR')) {
-        setError('Error de conectividad: No se puede conectar con el servidor.');
+        setError('🌐 Error de conexión: Verifica tu conexión a internet e intenta nuevamente.');
       } else {
-        setError('Error al cargar las citas: ' + err.message);
+        setError('⚠️ Error al cargar las consultas: ' + err.message);
       }
       setCitas([]);
     } finally {
@@ -278,9 +287,7 @@ const Citas = () => {
     try {
       setSubmitting(true);
       
-      // Validar datos antes de enviar
-      console.log('Form data original:', formData); // Debug
-      console.log('Empleado actual:', empleadoActual); // Debug
+    
       
       if (!formData.centroMedicoId) {
         throw new Error('No se puede determinar el centro médico. Por favor, inicie sesión nuevamente.');
@@ -305,7 +312,7 @@ const Citas = () => {
         idCentroMedico: parseInt(formData.centroMedicoId) || 0
       };
       
-      console.log('Datos mapeados para backend:', datosParaBackend); // Debug
+     
       
       if (modalMode === 'create') {
         await http.createConsulta(datosParaBackend);
@@ -352,7 +359,7 @@ const Citas = () => {
         idCentroMedico: parseInt(empleadoActual?.idCentroMedico) || 0
       };
       
-      console.log('Eliminando consulta con objeto completo:', consultaParaEliminar); // Debug
+    
       
       await http.deleteCita(citaToDelete.id, consultaParaEliminar);
       await cargarCitas();
@@ -523,18 +530,32 @@ const Citas = () => {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
           <div className="flex items-center space-x-2 mb-2">
-            <AlertCircle className="w-5 h-5 text-red-600" />
-            <span className="text-red-700 font-medium">Error de Conexión</span>
+            <AlertCircle className="w-5 h-5 text-amber-600" />
+            <span className="text-amber-700 font-medium">Problema de Conexión</span>
           </div>
-          <p className="text-red-700 mb-3">{error}</p>
-          <button
-            onClick={() => cargarCitas()}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
-          >
-            Reintentar
-          </button>
+          <p className="text-amber-700 mb-3">{error}</p>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => {
+                if (error && (error.toLowerCase().includes('inicie sesión') || error.toLowerCase().includes('autenticación') || error.toLowerCase().includes('unauthorized'))) {
+                  manejarErrorAutenticacion();
+                } else {
+                  cargarCitas();
+                }
+              }}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+            >
+              {error && (error.toLowerCase().includes('inicie sesión') || error.toLowerCase().includes('autenticación') || error.toLowerCase().includes('unauthorized')) ? '🚪 Ir al Login' : '🔄 Reintentar'}
+            </button>
+            <button
+              onClick={() => setError(null)}
+              className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors text-sm"
+            >
+              ✖ Cerrar
+            </button>
+          </div>
         </div>
       )}
 
@@ -543,12 +564,7 @@ const Citas = () => {
         {loading ? (
           <div className="p-8 text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-600 mt-4">
-              {empleadoActual && empleadoActual.tipoEmpleadoID === 1 
-                ? 'Cargando todas las consultas...' 
-                : 'Cargando tus consultas...'}
-            </p>
-            <p className="text-gray-500 text-sm mt-2">Timeout extendido a 30 segundos</p>
+            <p className="text-gray-600 mt-4">Cargando</p>
           </div>
         ) : citasFiltradas.length === 0 ? (
           <div className="p-8 text-center">
@@ -732,10 +748,7 @@ const Citas = () => {
                       ))
                     )}
                   </select>
-                  {/* Debug info */}
-                  <div className="text-xs text-gray-500 mt-1">
-                    Debug: {pacientes.length} pacientes disponibles (todos los centros médicos)
-                  </div>
+                  
                 </div>
 
                 <div>
