@@ -1,241 +1,371 @@
 import React, { useState, useEffect } from 'react';
 import { http } from '../service/httpClient';
-import { 
-  Heart,Hospital, Users, Calendar, Activity, UserPlus, FileText, 
-  Bell, Settings, LogOut, Stethoscope, Bed, Clock, TrendingUp, Loader2 
+import {
+  Users, Calendar, Activity, Building2, UserCog, Stethoscope,
+  AlertCircle, CheckCircle
 } from 'lucide-react';
 
 const Resumen = () => {
-  const defaultStats = [
-    {
-      title: 'Pacientes Hoy',
-      value: '156',
-      change: '+12%',
-      icon: Users,
-      color: 'bg-blue-500'
-    },
-    {
-      title: 'Citas Programadas',
-      value: '89',
-      change: '+5%',
-      icon: Calendar,
-      color: 'bg-green-500'
-    },
-    {
-      title: 'Emergencias',
-      value: '23',
-      change: '-8%',
-      icon: Activity,
-      color: 'bg-red-500'
-    },
-    {
-      title: 'Camas Disponibles',
-      value: '45',
-      change: '0%',
-      icon: Bed,
-      color: 'bg-purple-500'
-    }
-  ];
-  const defaultPatients = [
-    { name: 'María González', id: '001234', status: 'En consulta', time: '10:30 AM' },
-    { name: 'Carlos Rodríguez', id: '001235', status: 'Esperando', time: '11:00 AM' },
-    { name: 'Ana López', id: '001236', status: 'Completado', time: '11:30 AM' },
-    { name: 'Luis Martínez', id: '001237', status: 'En consulta', time: '12:00 PM' }
-  ];
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [data, setData] = useState({
+    centrosMedicos: [],
+    empleados: [],
+    usuarios: [],
+    consultas: [],
+    pacientes: [],
+    especialidades: []
+  });
 
-  const defaultActivity = [
-    { action: 'Nueva cita programada', patient: 'Elena Vargas', time: '2 min ago', type: 'appointment' },
-    { action: 'Historial actualizado', patient: 'Miguel Torres', time: '15 min ago', type: 'record' },
-    { action: 'Alta médica', patient: 'Sofia Jiménez', time: '1 hora ago', type: 'discharge' },
-    { action: 'Ingreso de emergencia', patient: 'Roberto Silva', time: '2 horas ago', type: 'emergency' }
-  ];
+  useEffect(() => {
+    loadAllData();
+  }, []);
 
-    const [dashboardData, setDashboardData] = useState({
-        stats: defaultStats,
-        recentPatients: defaultPatients,
-        recentActivity: defaultActivity,
-        loading: true,
-        error: null
+  const loadAllData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [
+        centrosMedicosRes,
+        empleadosRes,
+        usuariosRes,
+        consultasRes,
+        pacientesRes,
+        especialidadesRes
+      ] = await Promise.allSettled([
+        http.get('/Administracion/CentrosMedicos'),
+        http.get('/Administracion/Empleados'),
+        http.get('/Administracion/Usuarios'),
+        http.get('/CentroMedico/Consultas'),
+        http.get('/CentroMedico/Pacientes'),
+        http.get('/Administracion/Especialidades')
+      ]);
+
+      setData({
+        centrosMedicos: centrosMedicosRes.status === 'fulfilled' ? centrosMedicosRes.value.data.centros || [] : [],
+        empleados: empleadosRes.status === 'fulfilled' ? empleadosRes.value.data.empleados || [] : [],
+        usuarios: usuariosRes.status === 'fulfilled' ? usuariosRes.value.data.usuarios || [] : [],
+        consultas: consultasRes.status === 'fulfilled' ? consultasRes.value.data.consultas || [] : [],
+        pacientes: pacientesRes.status === 'fulfilled' ? pacientesRes.value.data.pacientes || [] : [],
+        especialidades: especialidadesRes.status === 'fulfilled' ? especialidadesRes.value.data.especialidades || [] : []
       });
 
-   useEffect(() => {
-      const loadDashboardData = async () => {
-        try {
-          setDashboardData(prev => ({ ...prev, loading: true, error: null }));
-  
-          // Intentar cargar datos del backend
-          const [statsData, patientsData, activityData] = await Promise.allSettled([
-            http.get('Dashboard/Stats'),
-            http.get('Dashboard/RecentPatients'),
-            http.get('Dashboard/RecentActivity')
-          ]);
-  
-          setDashboardData({
-            stats: statsData.status === 'fulfilled' ? statsData.value.data : defaultStats,
-            recentPatients: patientsData.status === 'fulfilled' ? patientsData.value.data : defaultPatients,
-            recentActivity: activityData.status === 'fulfilled' ? activityData.value.data : defaultActivity,
-            loading: false,
-            error: null
-          });
-        } catch (error) {
-          console.error('Error cargando datos del dashboard:', error);
-          setDashboardData({
-            stats: defaultStats,
-            recentPatients: defaultPatients,
-            recentActivity: defaultActivity,
-            loading: false,
-            error: 'Error de conexión - Mostrando datos de ejemplo'
-          });
-        }
-      };
-  
-      loadDashboardData();
-    }, []);
+    } catch (err) {
+      console.error('Error cargando datos del resumen:', err);
+      setError('Error al cargar los datos del sistema');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  if (dashboardData.loading) {
-    return (
-      <div className="p-6">
-        <p className="text-gray-600">Cargando resumen...</p>
-      </div>
-    );
-  }
+  // Calcular estadísticas
+  const getConsultasHoy = () => {
+    const hoy = new Date().toISOString().split('T')[0];
+    return data.consultas.filter(c => c.fecha?.startsWith(hoy)).length;
+  };
 
-  if (dashboardData.error) {
+  const getEmpleadosPorTipo = () => {
+    const porTipo = {};
+    data.empleados.forEach(emp => {
+      const tipo = emp.tipoEmpleado?.tipo || 'Sin tipo';
+      porTipo[tipo] = (porTipo[tipo] || 0) + 1;
+    });
+    return porTipo;
+  };
+
+  const getCentroConMasEmpleados = () => {
+    const porCentro = {};
+    data.empleados.forEach(emp => {
+      const centro = emp.centroMedico?.nombre || 'Sin asignar';
+      porCentro[centro] = (porCentro[centro] || 0) + 1;
+    });
+    const entries = Object.entries(porCentro);
+    return entries.length > 0 ? entries.sort((a, b) => b[1] - a[1])[0] : ['N/A', 0];
+  };
+
+  if (loading) {
     return (
-      <div className="p-6">
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded mb-4 text-sm">
-          {dashboardData.error}
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-sm">Cargando resumen del sistema...</p>
         </div>
-        {/* Mostrar igualmente contenido con datos por defecto */}
       </div>
     );
   }
+
+  if (error) {
+    return (
+      <div className="p-4">
+        <div className="bg-red-50 border border-red-200 text-red-800 px-3 py-2 rounded-lg flex items-center text-sm">
+          <AlertCircle className="w-4 h-4 mr-2" />
+          {error}
+        </div>
+      </div>
+    );
+  }
+
+  const statsCards = [
+    {
+      title: 'Centros',
+      value: data.centrosMedicos.length,
+      icon: Building2,
+      bgLight: 'bg-blue-50',
+      textColor: 'text-blue-600'
+    },
+    {
+      title: 'Empleados',
+      value: data.empleados.length,
+      icon: UserCog,
+      bgLight: 'bg-green-50',
+      textColor: 'text-green-600'
+    },
+    {
+      title: 'Pacientes',
+      value: data.pacientes.length,
+      icon: Users,
+      bgLight: 'bg-purple-50',
+      textColor: 'text-purple-600'
+    },
+    {
+      title: 'Consultas',
+      value: data.consultas.length,
+      icon: Calendar,
+      bgLight: 'bg-orange-50',
+      textColor: 'text-orange-600'
+    },
+    {
+      title: 'Hoy',
+      value: getConsultasHoy(),
+      icon: Activity,
+      bgLight: 'bg-red-50',
+      textColor: 'text-red-600'
+    },
+    {
+      title: 'Usuarios',
+      value: data.usuarios.length,
+      icon: CheckCircle,
+      bgLight: 'bg-teal-50',
+      textColor: 'text-teal-600'
+    },
+    {
+      title: 'Especialidades',
+      value: data.especialidades.length,
+      icon: Stethoscope,
+      bgLight: 'bg-indigo-50',
+      textColor: 'text-indigo-600'
+    }
+  ];
+
+  const empleadosPorTipo = getEmpleadosPorTipo();
+  const [centroTop, cantidadEmpleados] = getCentroConMasEmpleados();
 
   return (
-          <>
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {dashboardData.stats.map((stat, index) => (
-                <div key={index} className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                      <p className="text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
-                      <p className={`text-sm mt-2 flex items-center ${
-                        stat.change.startsWith('+') ? 'text-green-600' : 
-                        stat.change.startsWith('-') ? 'text-red-600' : 'text-gray-600'
-                      }`}>
-                        <TrendingUp className="w-4 h-4 mr-1" />
-                        {stat.change} vs. ayer
-                      </p>
-                    </div>
-                    <div className={`${stat.color} p-3 rounded-full`}>
-                      <stat.icon className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
+    <div className="h-screen overflow-hidden bg-gray-50 p-4">
+      <div className="h-full flex flex-col">
+        {/* Header compacto */}
+        <div className="mb-3">
+          <h1 className="text-xl font-bold text-gray-900">Resumen General del Sistema</h1>
+          <p className="text-gray-600 text-xs">Vista rápida de todos los datos del consultorio médico</p>
+        </div>
+
+        {/* Stats Cards - Ahora 7 tarjetas */}
+        <div className="grid grid-cols-7 gap-2 mb-3">
+          {statsCards.map((stat, index) => (
+            <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 hover:shadow-md transition-shadow">
+              <div className="flex flex-col items-center">
+                <div className={`${stat.bgLight} p-2 rounded-lg mb-2`}>
+                  <stat.icon className={`w-4 h-4 ${stat.textColor}`} />
                 </div>
-              ))}
+                <p className="text-xs font-medium text-gray-500 text-center mb-1">{stat.title}</p>
+                <p className="text-xl font-bold text-gray-900">{stat.value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Contenido principal en 3 columnas */}
+        <div className="flex-1 grid grid-cols-3 gap-3 overflow-hidden">
+          {/* Columna 1 */}
+          <div className="flex flex-col gap-3">
+            {/* Centros Médicos */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 flex flex-col overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-200">
+                <h2 className="text-sm font-semibold text-gray-900 flex items-center">
+                  <Building2 className="w-4 h-4 mr-2 text-blue-600" />
+                  Centros Médicos
+                </h2>
+              </div>
+              <div className="p-3 overflow-y-auto flex-1">
+                {data.centrosMedicos.length === 0 ? (
+                  <p className="text-gray-500 text-xs text-center py-2">No hay centros médicos</p>
+                ) : (
+                  <div className="space-y-2">
+                    {data.centrosMedicos.map((centro) => (
+                      <div key={centro.id} className="p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colores">
+                        <h3 className="font-semibold text-gray-900 text-xs">{centro.nombre}</h3>
+                        <p className="text-xs text-gray-600">{centro.ciudad}</p>
+                        <p className="text-xs text-gray-500 truncate">{centro.direccion}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Recent Patients */}
-              <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100">
-                <div className="p-6 border-b border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-gray-900">Pacientes Recientes</h2>
-                    <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                      Ver todos
-                    </button>
+            {/* Especialidades */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 flex flex-col overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-200">
+                <h2 className="text-sm font-semibold text-gray-900 flex items-center">
+                  <Stethoscope className="w-4 h-4 mr-2 text-indigo-600" />
+                  Especialidades
+                </h2>
+              </div>
+              <div className="p-3 overflow-y-auto flex-1">
+                {data.especialidades.length === 0 ? (
+                  <p className="text-gray-500 text-xs text-center py-2">No hay especialidades</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-1">
+                    {data.especialidades.map((esp) => (
+                      <div key={esp.id} className="p-1.5 bg-indigo-50 rounded text-center">
+                        <span className="text-xs font-medium text-indigo-900 block truncate">{esp.especialidad_}</span>
+                      </div>
+                    ))}
                   </div>
-                </div>
-                <div className="p-6">
-                  <div className="space-y-4">
-                    {dashboardData.recentPatients.map((patient, index) => (
-                      <div key={index} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-lg transition-colors">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                            <span className="text-sm font-medium text-gray-600">
-                              {patient.name.split(' ').map(n => n[0]).join('')}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{patient.name}</p>
-                            <p className="text-sm text-gray-500">ID: {patient.id}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                            patient.status === 'En consulta' ? 'bg-blue-100 text-blue-800' :
-                            patient.status === 'Esperando' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
-                            {patient.status}
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Columna 2 */}
+          <div className="flex flex-col gap-3">
+            {/* Empleados por Tipo */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 flex flex-col overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-200">
+                <h2 className="text-sm font-semibold text-gray-900 flex items-center">
+                  <UserCog className="w-4 h-4 mr-2 text-green-600" />
+                  Empleados por Tipo
+                </h2>
+              </div>
+              <div className="p-3 overflow-y-auto flex-1">
+                {Object.keys(empleadosPorTipo).length === 0 ? (
+                  <p className="text-gray-500 text-xs text-center py-2">No hay empleados</p>
+                ) : (
+                  <div className="space-y-2">
+                    {Object.entries(empleadosPorTipo).map(([tipo, cantidad]) => (
+                      <div key={tipo} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                        <span className="text-xs font-medium text-gray-700">{tipo}</span>
+                        <span className="text-xs font-bold text-gray-900 bg-green-100 px-2 py-1 rounded-full">
+                          {cantidad}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <div className="text-xs">
+                        <span className="text-gray-700 font-medium">Centro principal: </span>
+                        <span className="text-green-600 font-bold">{centroTop} ({cantidadEmpleados})</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Últimas Consultas */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 flex flex-col overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-200">
+                <h2 className="text-sm font-semibold text-gray-900 flex items-center">
+                  <Calendar className="w-4 h-4 mr-2 text-orange-600" />
+                  Últimas Consultas
+                </h2>
+              </div>
+              <div className="p-3 overflow-y-auto flex-1">
+                {data.consultas.length === 0 ? (
+                  <p className="text-gray-500 text-xs text-center py-2">No hay consultas</p>
+                ) : (
+                  <div className="space-y-2">
+                    {data.consultas.slice(0, 5).map((consulta) => (
+                      <div key={consulta.idConsultaMedica} className="p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colores">
+                        <div className="flex items-start justify-between mb-1">
+                          <span className="text-xs font-semibold text-gray-900 truncate flex-1">
+                            {consulta.paciente?.nombre || 'Paciente no especificado'}
                           </span>
-                          <p className="text-sm text-gray-500 mt-1">{patient.time}</p>
+                          <span className="text-xs text-gray-500 ml-2">{consulta.fecha}</span>
+                        </div>
+                        <div className="text-xs text-gray-600 space-y-0.5">
+                          <p className="truncate"><strong>Médico:</strong> {consulta.empleado?.nombre || 'N/A'}</p>
+                          <p className="truncate"><strong>Motivo:</strong> {consulta.motivo || 'N/A'}</p>
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
+                )}
               </div>
+            </div>
+          </div>
 
-              {/* Quick Actions */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-                <div className="p-6 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">Acciones Rápidas</h2>
-                </div>
-                <div className="p-6 space-y-3">
-                  <button className="w-full flex items-center space-x-3 p-3 text-left hover:bg-blue-50 rounded-lg transition-colors">
-                    <UserPlus className="w-5 h-5 text-blue-600" />
-                    <span className="font-medium">Registrar Paciente</span>
-                  </button>
-                  <button className="w-full flex items-center space-x-3 p-3 text-left hover:bg-green-50 rounded-lg transition-colors">
-                    <Calendar className="w-5 h-5 text-green-600" />
-                    <span className="font-medium">Nueva Cita</span>
-                  </button>
-                  <button className="w-full flex items-center space-x-3 p-3 text-left hover:bg-purple-50 rounded-lg transition-colors">
-                    <FileText className="w-5 h-5 text-purple-600" />
-                    <span className="font-medium">Ver Historial</span>
-                  </button>
-                  <button className="w-full flex items-center space-x-3 p-3 text-left hover:bg-red-50 rounded-lg transition-colors">
-                    <Activity className="w-5 h-5 text-red-600" />
-                    <span className="font-medium">Emergencia</span>
-                  </button>
-                </div>
+          {/* Columna 3 */}
+          <div className="flex flex-col gap-3">
+            {/* Usuarios del Sistema */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 flex flex-col overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-200">
+                <h2 className="text-sm font-semibold text-gray-900 flex items-center">
+                  <CheckCircle className="w-4 h-4 mr-2 text-teal-600" />
+                  Usuarios del Sistema
+                </h2>
+              </div>
+              <div className="p-3 overflow-y-auto flex-1">
+                {data.usuarios.length === 0 ? (
+                  <p className="text-gray-500 text-xs text-center py-2">No hay usuarios</p>
+                ) : (
+                  <div className="space-y-2">
+                    {data.usuarios.map((usuario) => (
+                      <div key={usuario.id} className="p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colores">
+                        <h3 className="font-semibold text-gray-900 text-xs">{usuario.nombreUsuario}</h3>
+                        <p className="text-xs text-gray-600 truncate">
+                          {usuario.empleado?.nombre || 'No asignado'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Recent Activity */}
-            <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-100">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Actividad Reciente</h2>
+            {/* Pacientes Recientes */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 flex flex-col overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-200">
+                <h2 className="text-sm font-semibold text-gray-900 flex items-center">
+                  <Users className="w-4 h-4 mr-2 text-purple-600" />
+                  Pacientes Recientes
+                </h2>
               </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  {dashboardData.recentActivity.map((activity, index) => (
-                    <div key={index} className="flex items-center space-x-3 p-3 hover:bg-gray-50 rounded-lg">
-                      <div className={`w-2 h-2 rounded-full ${
-                        activity.type === 'appointment' ? 'bg-blue-500' :
-                        activity.type === 'record' ? 'bg-green-500' :
-                        activity.type === 'discharge' ? 'bg-purple-500' :
-                        'bg-red-500'
-                      }`} />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-                        <p className="text-xs text-gray-500">{activity.patient}</p>
+              <div className="p-3 overflow-y-auto flex-1">
+                {data.pacientes.length === 0 ? (
+                  <p className="text-gray-500 text-xs text-center py-2">No hay pacientes</p>
+                ) : (
+                  <div className="space-y-2">
+                    {data.pacientes.slice(0, 5).map((paciente) => (
+                      <div key={paciente.idPaciente} className="p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colores">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-gray-900 text-xs truncate">{paciente.nombre}</h3>
+                            <p className="text-xs text-gray-600">Cédula: {paciente.cedula}</p>
+                            <p className="text-xs text-gray-500">Tel: {paciente.telefono}</p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-400">
-                        <Clock className="w-3 h-3 inline mr-1" />
-                        {activity.time}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
-          </>
-        )
-}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
-export default Resumen
+export default Resumen;
