@@ -15,6 +15,7 @@ import CentroMedico from "./CentroMedico";
 import Empleados from "./Empleados";
 import Resumen from "./Resumen";
 import Citas from "./Citas";
+import Pacientes from "./Pacientes";
 import Logo from "../assets/Logo.png";
 
 const Dashboard = () => {
@@ -22,66 +23,73 @@ const Dashboard = () => {
   const [activeSection, setActiveSection] = useState("overview");
 
   const menuItems = [
-    { id: "employees", label: "Empleados", icon: Users },
-    { id: "patients", label: "Centros Médicos", icon: Hospital },
-    { id: "appointments", label: "Citas", icon: Calendar },
-    { id: "medical-records", label: "Historiales", icon: FileText },
-    { id: "staff", label: "Personal", icon: Stethoscope },
-    { id: "settings", label: "Configuración", icon: Settings },
-  ];
+  { id: "employees", label: "Empleados", icon: Users },
+  { id: "centers", label: "Centros Médicos", icon: Hospital },
+  { id: "patients", label: "Pacientes", icon: Heart },
+  { id: "appointments", label: "Citas", icon: Calendar },
+  { id: "medical-records", label: "Historiales", icon: FileText },
+  { id: "staff", label: "Personal", icon: Stethoscope },
+  { id: "settings", label: "Configuración", icon: Settings },
+];
 
   const renderContent = () => {
-    switch (activeSection) {
-      case "patients":
-        return (
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <CentroMedico />
-          </div>
-        );
-      case "employees":
-        return (
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <Empleados />
-          </div>
-        );
-      case "appointments":
-        return (
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <Citas />
-          </div>
-        );
-      case "medical-records":
-        return (
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h1 className="text-xl font-semibold mb-2">Historiales Médicos</h1>
-            <p className="text-gray-600 text-sm">
-              Listado / búsqueda de historiales.
-            </p>
-          </div>
-        );
-      case "staff":
-        return (
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h1 className="text-xl font-semibold mb-2">Personal</h1>
-            <p className="text-gray-600 text-sm">
-              Gestión de médicos y personal sanitario.
-            </p>
-          </div>
-        );
-      case "settings":
-        return (
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h1 className="text-xl font-semibold mb-2">Configuración</h1>
-            <p className="text-gray-600 text-sm">
-              Preferencias de la aplicación.
-            </p>
-          </div>
-        );
-      case "overview":
-      default:
-        return <Resumen />;
-    }
-  };
+  switch (activeSection) {
+    case "centers":
+      return (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <CentroMedico />
+        </div>
+      );
+    case "employees":
+      return (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <Empleados />
+        </div>
+      );
+    case "patients":
+      return (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <Pacientes />
+        </div>
+      );
+    case "appointments":
+      return (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <Citas />
+        </div>
+      );
+    case "medical-records":
+      return (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h1 className="text-xl font-semibold mb-2">Historiales Médicos</h1>
+          <p className="text-gray-600 text-sm">
+            Listado / búsqueda de historiales.
+          </p>
+        </div>
+      );
+    case "staff":
+      return (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h1 className="text-xl font-semibold mb-2">Personal</h1>
+          <p className="text-gray-600 text-sm">
+            Gestión de médicos y personal sanitario.
+          </p>
+        </div>
+      );
+    case "settings":
+      return (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h1 className="text-xl font-semibold mb-2">Configuración</h1>
+          <p className="text-gray-600 text-sm">
+            Preferencias de la aplicación.
+          </p>
+        </div>
+      );
+    case "overview":
+    default:
+      return <Resumen />;
+  }
+};
 
   return (
     <div className="min-h-screen bg-gray-50">
