@@ -25,7 +25,7 @@ const CrearCentroMed = ({ show, onClose, onSubmit, initialData }) => {
   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-60 p-4">
 
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
-       
+
         <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -62,14 +62,17 @@ const CrearCentroMed = ({ show, onClose, onSubmit, initialData }) => {
               <label className="block text-lg font-medium text-gray-700 mb-2">
                 Ciudad
               </label>
-              <input
-                type="text"
+              <select
                 name="ciudad"
                 value={formData.ciudad}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Quito"
-              />
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+              >
+                <option value="" disabled>Seleccione una ciudad</option>
+                <option value="Quito">Quito</option>
+                <option value="Guayaquil">Guayaquil</option>
+                <option value="Cuenca">Cuenca</option>
+              </select>
             </div>
             <div>
               <label className="block text-lg font-medium text-gray-700 mb-2">
